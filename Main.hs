@@ -1,5 +1,4 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE NamedFieldPuns, RebindableSyntax #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Main (main) where
 
@@ -16,6 +15,7 @@ import Data.ClassFile
 import Data.ClassFile.Access
 
 import Language.Brainfuck.Emitter
+import Language.Brainfuck.Optimizer
 import Language.Brainfuck.Parser
 
 import System.IO
@@ -24,12 +24,16 @@ import Prelude hiding (Monad (..))
 
 main :: IO ()
 main = BL.getContents Monad.>>=
-       either (hPutStrLn stderr) (putBinary .
-                                  runPut .
-                                  putClassFile .
-                                  f .
-                                  execCode (public .|. final) "run" ()V .
-                                  emit) . parse
+       either
+       (hPutStrLn stderr)
+       (putBinary .
+        runPut .
+        putClassFile .
+        f .
+        execCode (public .|. final) "run" ()V .
+        emit .
+        optimize) .
+       parse
   where
     putBinary s = hSetBinaryMode stdout True *>
                   BL.putStr s <*

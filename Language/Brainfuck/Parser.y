@@ -41,10 +41,10 @@ many_commands : many_reversed_commands { reverse $1 }
 many_reversed_commands : { [] }
                        | many_reversed_commands command { $2 : $1 }
 
-command : INCREMENT_POINTER { IncrementPointer }
-        | DECREMENT_POINTER { DecrementPointer }
-        | INCREMENT_BYTE { IncrementByte } 
-        | DECREMENT_BYTE { DecrementByte }
+command : INCREMENT_POINTER { IncrementPointer 1 }
+        | DECREMENT_POINTER { IncrementPointer (-1) }
+        | INCREMENT_BYTE { IncrementByte 1 } 
+        | DECREMENT_BYTE { IncrementByte (-1) }
         | OUTPUT_BYTE { OutputByte }
         | INPUT_BYTE { InputByte }
         | while_nonzero { $1 }

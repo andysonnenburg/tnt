@@ -1,9 +1,9 @@
 module Language.Brainfuck.Command (Command (..)) where
 
-data Command = IncrementPointer
-             | DecrementPointer
-             | IncrementByte
-             | DecrementByte
+import Data.Int
+
+data Command = IncrementPointer Int16
+             | IncrementByte Int32
              | OutputByte
              | InputByte
              | WhileNonzero [Command] deriving Show
