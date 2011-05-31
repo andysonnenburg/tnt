@@ -28,8 +28,9 @@ data S = S { constantPoolCount :: Word16
            , constantPoolMap :: Map CpInfo Word16
            } 
 
-newtype ConstantPool a = ConstantPool { unConstantPool :: State S a }
-                       deriving (Functor, Applicative, Monad, MonadFix)
+newtype ConstantPool a = ConstantPool
+                         { unConstantPool :: State S a
+                         } deriving (Functor, Applicative, Monad, MonadFix)
 
 runConstantPool :: ConstantPool a -> (a, Word16, [CpInfo])
 runConstantPool m = case runState (unConstantPool m) initState of

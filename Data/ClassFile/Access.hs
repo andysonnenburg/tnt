@@ -10,6 +10,8 @@ module Data.ClassFile.Access
 
 import Data.Word
 
+newtype AccessFlags = AccessFlags { unAccessFlags :: Word16}
+
 public :: Word16
 public = 0x0001
 

@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Code.Class
        ( MonadCode (..)
@@ -215,20 +216,20 @@ instance TakeF Zero b where
 instance TakeF (Succ a) (b, c) where
   type Take (Succ a) (b, c) = (b, Take (Subtract (Succ a) (Category b)) c)
 
--- class (Natural a, List b) => DropF a b where
---   type Drop a b
+class DropF a b where
+  type Drop a b
 
--- instance List b => DropF Zero b where
---   type Drop Zero b = b
+instance DropF Zero b where
+  type Drop Zero b = b
 
--- instance (Natural a, List c) => DropF (Succ a) (Cons b c) where
---   type Drop (Succ a) (Cons b c) = Drop (Subtract (Succ a) (Category b)) c
+instance DropF (Succ a) (b, c) where
+  type Drop (Succ a) (b, c) = Drop (Subtract (Succ a) (Category b)) c
 
--- class (Natural a, List b) => SplitAtF a b where
---   type SplitAt a b
+class SplitAtF a b where
+  type SplitAt a b
 
--- instance (Natural a, List b) => SplitAtF a b where
---   type SplitAt a b = (Take a b, Drop a b)
+instance SplitAtF a b where
+  type SplitAt a b = (Take a b, Drop a b)
 
 class ConcatF a b where
   type Concat a b
@@ -284,24 +285,24 @@ instance PushF Double a where
 instance PushF Reference a where
   type Push Reference a = (Reference, a)
 
-type Instruction m i j = m i j (Label m i)
+type Operation m i j = m i j (Label m i)
 
 class Parameterized.Monad m => MonadCode m where
   
   data Label m :: * -> *
   
-  aaload :: Instruction m (Int, (Reference, xs)) (Reference, xs)
-  aastore :: Instruction m (Reference, (Int, (Reference, xs))) xs
-  aconst_null :: Instruction m xs (Reference, xs)
-  aload :: Word16 -> Instruction m xs (Reference, xs)
+  aaload :: Operation m (Int, (Reference, xs)) (Reference, xs)
+  aastore :: Operation m (Reference, (Int, (Reference, xs))) xs
+  aconst_null :: Operation m xs (Reference, xs)
+  aload :: Word16 -> Operation m xs (Reference, xs)
   -- anewarray :: Reference -> m (Cons Int xs) (Cons Reference xs) (Label m)
   -- areturn :: m (Cons Reference xs) xs (Label m)
   -- arraylength :: m (Cons Reference xs) (Cons Int xs) (Label m)
-  astore :: Word16 -> Instruction m (Reference, xs) xs
+  astore :: Word16 -> Operation m (Reference, xs) xs
   -- athrow :: m (Cons Reference xs) xs (Label m)
   
-  baload :: Instruction m (Int, (Reference, xs)) (Int, xs)
-  bastore :: Instruction m (Int, (Int, (Reference, xs))) xs
+  baload :: Operation m (Int, (Reference, xs)) (Int, xs)
+  bastore :: Operation m (Int, (Int, (Reference, xs))) xs
   
   -- caload :: m (Cons Int (Cons Reference xs)) (Cons Int xs) (Label m)
   -- castore :: m (Cons Int (Cons Int (Cons Reference xs))) xs (Label m)
@@ -323,7 +324,7 @@ class Parameterized.Monad m => MonadCode m where
   -- dreturn :: m (Cons Double xs) xs (Label m)
   -- dstore :: Word16 -> m xs (Cons Double xs) (Label m)
   -- dsub :: m (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  dup :: Category value ~ One => Instruction m (value, xs) (value, (value, xs))
+  dup :: Category value ~ One => Operation m (value, xs) (value, (value, xs))
   -- dup_x1 :: ( Category value1 ~ One
   --           , Category value2 ~ One
   --           ) =>
@@ -338,7 +339,7 @@ class Parameterized.Monad m => MonadCode m where
   --           (Cons value1 xs)
   --           (Cons value1 (Concat value2 (Cons value1 xs')))
   --           (Label m)
-  dup2 :: (value ~ Take Two xs) => Instruction m xs (Concat value xs)
+  dup2 :: (value ~ Take Two xs) => Operation m xs (Concat value xs)
   -- dup2_x1 :: ( value1 ~ Take Two xs
   --            , (value2, xs') ~ SplitAt Three xs
   --            ) => m xs (Concat value2 (Concat value1 xs')) (Label m)
@@ -355,19 +356,19 @@ class Parameterized.Monad m => MonadCode m where
                String ->
                String ->
                value ->
-               Instruction m xs (Push value xs)
+               Operation m xs (Push value xs)
   
-  goto :: Label m xs -> Instruction m xs xs
+  goto :: Label m xs -> Operation m xs xs
   
-  i2b :: Instruction m (Int, xs) (Int, xs)
+  i2b :: Operation m (Int, xs) (Int, xs)
   
-  iadd :: Instruction m (Int, (Int, xs)) (Int, xs)
+  iadd :: Operation m (Int, (Int, xs)) (Int, xs)
   
-  iinc :: Word16 -> Int16 -> Instruction m xs xs
+  iinc :: Word16 -> Int16 -> Operation m xs xs
   
-  ifeq :: Label m xs -> Instruction m (Int, xs) xs
+  ifeq :: Label m xs -> Operation m (Int, xs) xs
   
-  iload :: Word16 -> Instruction m xs (Int, xs)
+  iload :: Word16 -> Operation m xs (Int, xs)
   
   invokeinterface :: ( ParameterDesc args  
                      , ReturnDesc result
@@ -376,7 +377,7 @@ class Parameterized.Monad m => MonadCode m where
                      String ->
                      args ->
                      result ->
-                     Instruction m xs
+                     Operation m xs
                      (Push result (Pop Reference (Pop args xs)))
   invokespecial :: ( ParameterDesc args
                    , ReturnDesc result
@@ -385,7 +386,7 @@ class Parameterized.Monad m => MonadCode m where
                    String ->
                    args ->
                    result ->
-                   Instruction m xs (Push result (Pop Reference (Pop args xs)))
+                   Operation m xs (Push result (Pop Reference (Pop args xs)))
   invokevirtual :: ( ParameterDesc args
                    , ReturnDesc result
                    ) =>
@@ -393,27 +394,27 @@ class Parameterized.Monad m => MonadCode m where
                    String ->
                    args ->
                    result ->
-                   Instruction m xs (Push result (Pop Reference (Pop args xs)))
+                   Operation m xs (Push result (Pop Reference (Pop args xs)))
   
-  istore :: Word16 -> Instruction m (Int, xs) xs
+  istore :: Word16 -> Operation m (Int, xs) xs
   
-  isub :: Instruction m (Int, (Int, xs)) (Int, xs)
+  isub :: Operation m (Int, (Int, xs)) (Int, xs)
   
-  ldcInt :: Int32 -> Instruction m xs (Int, xs)
-  ldcFloat :: Prelude.Float -> Instruction m xs (Float, xs)
-  ldcString :: String -> Instruction m xs (Reference, xs)
-  ldcClass :: String -> Instruction m xs (Reference, xs)
-  ldcLong :: Int64 -> Instruction m xs (Long, xs)
-  ldcDouble :: Prelude.Double -> Instruction m xs (Double, xs)
+  ldcInt :: Int32 -> Operation m xs (Int, xs)
+  ldcFloat :: Prelude.Float -> Operation m xs (Float, xs)
+  ldcString :: String -> Operation m xs (Reference, xs)
+  ldcClass :: String -> Operation m xs (Reference, xs)
+  ldcLong :: Int64 -> Operation m xs (Long, xs)
+  ldcDouble :: Prelude.Double -> Operation m xs (Double, xs)
   
-  new :: String -> Instruction m xs (Reference, xs)
-  newarray :: ArrayType -> Instruction m (Int, xs) (Reference, xs)
-  nop :: Instruction m xs xs
+  new :: String -> Operation m xs (Reference, xs)
+  newarray :: ArrayType -> Operation m (Int, xs) (Reference, xs)
+  nop :: Operation m xs xs
   
-  return :: Instruction m xs xs
+  return :: Operation m xs xs
   
 class MonadCode m => LDC a b m | a -> b where
-  ldc :: b -> Instruction m xs (a, xs)
+  ldc :: b -> Operation m xs (a, xs)
 
 instance MonadCode m => LDC Int Int32 m where
   ldc = ldcInt
@@ -421,7 +422,7 @@ instance MonadCode m => LDC Int Int32 m where
 instance MonadCode m => LDC Float Prelude.Float m where
   ldc = ldcFloat
 
-instance MonadCode m => LDC Reference [Char] m where
+instance MonadCode m => LDC Reference String m where
   ldc = ldcString
 
 instance MonadCode m => LDC Long Int64 m where
