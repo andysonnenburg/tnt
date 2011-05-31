@@ -24,13 +24,17 @@ import Prelude hiding (Monad (..))
 
 main :: IO ()
 main = BL.getContents Monad.>>=
-       either (hPutStrLn stderr) (BL.putStr .
+       either (hPutStrLn stderr) (putBinary .
                                   runPut .
                                   putClassFile .
                                   f .
                                   execCode (public .|. final) "run" ()V .
                                   emit) . parse
   where
+    putBinary s = hSetBinaryMode stdout True *>
+                  BL.putStr s <*
+                  hSetBinaryMode stdout False
+                  
     initMethod = execCode
       public "<init>" ()V $ do
         aload 0
