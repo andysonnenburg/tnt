@@ -78,5 +78,20 @@ emitCommand (WhileNonzero xs) =
     goto start
     end <- nop
     M.return (start, end))
+{- emitCommand (WhileNonzero xs) =
+  do
+    rec
+      start <- aload 1
+      iload 2
+      baload
+      ifeq end
+      forM_ xs emitCommand
+      goto start
+      end <- nop
+    M.return start -}
+  
 
-emitFooter = return
+emitFooter = do
+  getstatic "java/lang/System" "out" (L"java/io/PrintStream")
+  invokevirtual (L"java/io/PrintStream") "flush" ()V
+  return

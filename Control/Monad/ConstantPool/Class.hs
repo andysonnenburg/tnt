@@ -13,3 +13,4 @@ class Monad m => MonadConstantPool m where
   lookupFloat :: Float -> m Word16
   lookupLong :: Int64 -> m Word16
   lookupDouble :: Double -> m Word16
+  lookupUtf8 :: String -> m Word16

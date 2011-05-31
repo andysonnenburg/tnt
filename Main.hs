@@ -1,39 +1,65 @@
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Main (main) where
 
+import Control.Applicative
+import qualified Control.Monad as Monad
 import Control.Monad.Code
 import Control.Monad.ConstantPool
-import Control.Monad.Fix
-import qualified Control.Monad.Parameterized as Parameterized
+import Control.Monad.Parameterized hiding (return)
 
+import Data.Binary.Put
+import Data.Bits
 import qualified Data.ByteString.Lazy as BL
-import Data.ClassFile.Attribute
+import Data.ClassFile
+import Data.ClassFile.Access
 
 import Language.Brainfuck.Emitter
 import Language.Brainfuck.Parser
 
 import System.IO
 
-main :: IO ()
+import Prelude hiding (Monad (..))
 
-main = BL.getContents >>=
-       either (hPutStrLn stderr) (print .
+main :: IO ()
+main = BL.getContents Monad.>>=
+       either (hPutStrLn stderr) (BL.putStr .
+                                  runPut .
+                                  putClassFile .
                                   f .
-                                  runConstantPool .
-                                  execCode .
+                                  execCode (public .|. final) "run" ()V .
                                   emit) . parse
   where
-    f (Attribute _ x, n, xs) = (BL.unpack x, n, xs)
-
--- main =
---   print .
---   f .
---   runConstantPool .
---   execCode .
---   mfix $ \end -> do
---     begin <- goto end
---     goto begin
---     end <- nop
---     Parameterized.return end
---  where
---    f (Attribute _ x, n, xs) = (BL.unpack x, n, xs)
-
+    initMethod = execCode
+      public "<init>" ()V $ do
+        aload 0
+        invokespecial "java/lang/Object" "<init>" ()V
+        return
+    
+    mainMethod = execCode
+      (public .|. static .|. final) "main" (A(L"java/lang/String"))V $ do
+        new "Main"
+        dup
+        invokespecial "Main" "<init>" ()V
+        invokevirtual (L"Main") "run" ()V
+        return
+        
+    f runMethod = ClassFile { minorVersion = 0
+                            , majorVersion = 50
+                            , constantPoolLength
+                            , constantPool
+                            , accessFlags = public .|. final
+                            , thisClass
+                            , superClass
+                            , interfaces = []
+                            , fields = []
+                            , methods
+                            , attributes = []
+                            }
+      where
+        ((thisClass, superClass, methods), constantPoolLength, constantPool) =
+          runConstantPool ((,,)
+                           <$> lookupClass "Main"
+                           <*> lookupClass "java/lang/Object"
+                           <*> sequence [runMethod, initMethod, mainMethod])

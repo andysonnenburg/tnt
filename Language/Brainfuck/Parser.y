@@ -1,4 +1,5 @@
 {
+{-# OPTIONS_GHC -fspec-constr-count=10 #-}
 module Language.Brainfuck.Parser (parse) where
 
 import qualified Data.ByteString.Lazy as BL

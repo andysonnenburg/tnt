@@ -16,10 +16,12 @@ module Control.Monad.Code.Class
        , ReturnAddress ()
        , Reference (..)
        , Void (..)
+       , ParameterDesc ()
+       , ReturnDesc ()
        , desc
        , descs
-       , methodDesc
        , stackSize
+       , methodDesc
        , internalName
        ) where
 
@@ -55,8 +57,9 @@ class Desc a where
   desc :: a -> String
   stackSize :: a -> Word16
   
-  descs = (++) . desc
   desc = flip descs ""
+  descs = (++) . desc
+  stackSize _ = 1
 
 instance Desc Int where
   desc B = "B"
@@ -64,7 +67,6 @@ instance Desc Int where
   desc I = "I"
   desc C = "C"
   desc Z = "Z"
-  stackSize _ = 1
 
 instance Desc Long where
   desc = const "L"
@@ -72,7 +74,6 @@ instance Desc Long where
 
 instance Desc Float where
   desc = const "F"
-  stackSize _ = 1
 
 instance Desc Double where
   desc = const "D"
@@ -81,7 +82,6 @@ instance Desc Double where
 instance Desc Reference where
   descs (L x) = showChar 'L' . showString x . showChar ';'
   descs (A x) = showChar '[' . descs x
-  stackSize _ = 1
 
 instance Desc Void where
   desc = const "V"
@@ -143,9 +143,9 @@ $(forM [2 :: Word8 .. fromIntegral maxTupleSize] $ \i -> do
   names <- replicateM i' (newName "a")
   
   let tvs = map varT names
-      ctxt = cxt . map (classP ''FieldType . (:[])) $ tvs
+      ctxt = cxt . map (\tv -> classP ''FieldType [tv]) $ tvs
       typ = appT (conT ''ParameterDesc) . foldl' appT (tupleT i') $ tvs
-  
+
   instanceD ctxt typ [])
 
 class Desc a => ReturnDesc a where
@@ -323,8 +323,7 @@ class Parameterized.Monad m => MonadCode m where
   -- dreturn :: m (Cons Double xs) xs (Label m)
   -- dstore :: Word16 -> m xs (Cons Double xs) (Label m)
   -- dsub :: m (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  -- dup :: Category value ~ One =>
-  --        m (Cons value xs) (Cons value (Cons value xs)) (Label m)
+  dup :: Category value ~ One => Instruction m (value, xs) (value, (value, xs))
   -- dup_x1 :: ( Category value1 ~ One
   --           , Category value2 ~ One
   --           ) =>
@@ -370,6 +369,23 @@ class Parameterized.Monad m => MonadCode m where
   
   iload :: Word16 -> Instruction m xs (Int, xs)
   
+  invokeinterface :: ( ParameterDesc args  
+                     , ReturnDesc result
+                     ) =>
+                     String ->
+                     String ->
+                     args ->
+                     result ->
+                     Instruction m xs
+                     (Push result (Pop Reference (Pop args xs)))
+  invokespecial :: ( ParameterDesc args
+                   , ReturnDesc result
+                   ) =>
+                   String ->
+                   String ->
+                   args ->
+                   result ->
+                   Instruction m xs (Push result (Pop Reference (Pop args xs)))
   invokevirtual :: ( ParameterDesc args
                    , ReturnDesc result
                    ) =>
@@ -383,8 +399,6 @@ class Parameterized.Monad m => MonadCode m where
   
   isub :: Instruction m (Int, (Int, xs)) (Int, xs)
   
-  newarray :: ArrayType -> Instruction m (Int, xs) (Reference, xs)
-  
   ldcInt :: Int32 -> Instruction m xs (Int, xs)
   ldcFloat :: Prelude.Float -> Instruction m xs (Float, xs)
   ldcString :: String -> Instruction m xs (Reference, xs)
@@ -392,6 +406,8 @@ class Parameterized.Monad m => MonadCode m where
   ldcLong :: Int64 -> Instruction m xs (Long, xs)
   ldcDouble :: Prelude.Double -> Instruction m xs (Double, xs)
   
+  new :: String -> Instruction m xs (Reference, xs)
+  newarray :: ArrayType -> Instruction m (Int, xs) (Reference, xs)
   nop :: Instruction m xs xs
   
   return :: Instruction m xs xs

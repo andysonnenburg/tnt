@@ -1,4 +1,7 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, RecordWildCards #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-} 
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Control.Monad.ConstantPool
        ( module Control.Monad.ConstantPool.Class
        , ConstantPool
@@ -10,24 +13,15 @@ import Control.Monad
 import Control.Monad.ConstantPool.Class
 import Control.Monad.State
 
-import Data.Int
+import Data.ClassFile.CpInfo
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Word
 
 import Prelude hiding (lookup)
 
-data CpInfo = Class Word16
-            | Fieldref Word16 Word16
-            | Methodref Word16 Word16
-            | InterfaceMethodref Word16 Word16
-            | String Word16
-            | Integer Int32
-            | Float Float
-            | Long Int64
-            | Double Double
-            | NameAndType Word16 Word16
-            | Utf8 String deriving (Show, Eq, Ord)
+deriving instance Eq CpInfo
+deriving instance Ord CpInfo
 
 data S = S { constantPoolCount :: Word16
            , constantPool :: [CpInfo]
@@ -71,15 +65,14 @@ instance MonadConstantPool ConstantPool where
   lookupLong = lookup . Long
   
   lookupDouble = lookup . Double
+  
+  lookupUtf8 = lookup . Utf8
 
 lookupNameAndType :: String -> String -> ConstantPool Word16
 lookupNameAndType name dsc = do
   i <- lookupUtf8 name
   j <- lookupUtf8 dsc
   lookup $ NameAndType i j
-
-lookupUtf8 :: String -> ConstantPool Word16
-lookupUtf8 = lookup . Utf8
 
 lookup :: CpInfo -> ConstantPool Word16
 lookup x = ConstantPool $ do

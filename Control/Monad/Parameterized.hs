@@ -1,8 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
-module Control.Monad.Parameterized (Monad (..), WrappedMonad (..)) where
-
-import qualified Control.Monad as Monad
-import Control.Monad.Fix
+module Control.Monad.Parameterized (Monad (..)) where
 
 import Prelude hiding (Monad (..))
 
@@ -16,21 +13,4 @@ class Monad m where
   
   {-# INLINE (>>) #-}
   m >> k = m >>= \_ -> k
-  fail s = error s
-
-newtype WrappedMonad m i j a = WrapMonad { unwrapMonad :: m a }
-
-instance Monad.Monad m => Monad.Monad (WrappedMonad m i i) where
-  (>>=) = (>>=)
-  (>>) = (>>)
-  return = return
-  fail = fail
-
-instance Monad.Monad m => Monad (WrappedMonad m) where
-  WrapMonad m >>= k = WrapMonad (m Monad.>>= (unwrapMonad . k))
-  WrapMonad m >> WrapMonad n = WrapMonad (m Monad.>> n)
-  return = WrapMonad . Monad.return
-  fail = WrapMonad . Monad.fail
-
-instance MonadFix m => MonadFix (WrappedMonad m i i) where
-  mfix k = WrapMonad . mfix $ (unwrapMonad . k)
+  fail = error

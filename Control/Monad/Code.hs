@@ -1,20 +1,23 @@
+{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE DoRec #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 module Control.Monad.Code
        ( module Control.Monad.Code.Class
        , Control.Monad.Code.Class.Int (..)
+       , Control.Monad.Code.Class.return
        , CodeT
        , runCode
        , execCode
        ) where
 
 import Control.Applicative hiding (Const)
-import Control.Monad
+import Control.Monad hiding (return)
 import qualified Control.Monad as Monad
 import Control.Monad.Code.Class hiding (Int (..), return)
 import qualified Control.Monad.Code.Class
@@ -29,42 +32,42 @@ import Control.Monad.Writer
 import Data.Array.Unboxed
 import Data.Binary.Builder
 import Data.ClassFile.Attribute
+import Data.ClassFile.CodeAttribute (CodeAttribute (CodeAttribute))
+import qualified Data.ClassFile.CodeAttribute
+import Data.ClassFile.MethodInfo
+import Data.Graph
 import Data.Int
 import Data.List
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
 import Data.Ord
 import Data.Word
 
-import Prelude hiding (Double, Float, Int, Integer)
+import Prelude hiding (Double, Float, Int, Integer, return)
 
-data Expr = Expr Int32 ([Word16] -> [Word16]) ([Word16] -> [Word16])
-
-instance Show Expr where
-  showsPrec p (Expr a b c) = showParen (p > 10) $ showString "Expr " .
-                             shows a . showChar ' ' .
-                             shows (b []) . showChar ' ' .
-                             shows (c [])
-
-instance Eq Expr where
-  (Expr a b c) == (Expr x y z) = a == x && b [] == y [] && c [] == z []
+data Expr = Expr Int32 (IntMap Int32) deriving (Show, Eq)
 
 instance Num Expr where
-  (Expr a b c) + (Expr x y z) = Expr (a + x) (b . y) (c . z)
+  (Expr a b) + (Expr x y) = Expr (a + x) (IntMap.unionWith (+) b y)
   (*) = undefined
-  (Expr a b c) - (Expr x y z) = Expr (a - x) (b . z) (c . y)
-  fromInteger x = Expr (fromIntegral x) id id
+  (Expr a b) - (Expr x y) = Expr (a - x) (IntMap.unionWith (+) b y')
+    where y' = IntMap.map negate y
+  fromInteger x = Expr (fromIntegral x) IntMap.empty
   abs = undefined
   signum = undefined
 
-eval (Expr a b c) = do
+eval (Expr x y) = do
   env <- ask
-  return $ a + sum (map (env !) (b [])) - sum (map (env !) (c []))
+  let f _ 0 b = b
+      f k a b = (env ! k) * a + b
+  return $ x + IntMap.foldWithKey f 0 y
 
-type Eval = WriterT Builder (ReaderT (UArray Word16 Int32) [])
+type Eval = WriterT Builder (ReaderT (UArray Int Int32) [])
 
 data S = S { stack :: Word16
            , maxStack :: Word16
            , maxLocals :: Word16
-           , varCount :: Word16
+           , varCount :: Int
            , varDomain :: [[Int32]]
            , codeLength :: Expr
            , code :: Eval ()
@@ -77,24 +80,60 @@ deriving instance (Functor m, Monad m) => Applicative (CodeT m i i)
 deriving instance Monad m => Monad (CodeT m i i)
 deriving instance MonadFix m => MonadFix (CodeT m i i)
 
-runCode :: Monad m => CodeT m () i a -> m (a, Attribute)
-runCode (CodeT m) = do
+runCode :: ( ParameterDesc parameters
+           , ReturnDesc result
+           , MonadConstantPool m
+           ) =>
+           Word16 ->
+           String ->
+           parameters ->
+           result ->
+           CodeT m () i a -> m (a, MethodInfo)
+runCode accessFlags name args result (CodeT m) = do
+  nameIndex <- lookupUtf8 name
+  descriptorIndex <- lookupUtf8 (methodDesc args result)
   (a, S {..}) <- runStateT m initState
+  let varDomain' = reverse varDomain
+      code' = code >> eval codeLength
   let x = snd . head . sortBy (comparing fst) $ do
-          let varDomain' = reverse varDomain
-              code' = code >> eval codeLength
-          env <- listArray (0, varCount - 1) <$> f varDomain'
-          (runReaderT . runWriterT) code' env
-  Monad.return (a, Attribute "CodeAttribute" (toLazyByteString x))
+        env <- listArray (0, varCount - 1) <$> f varDomain'
+        (runReaderT . runWriterT) code' env
+  attr <- toAttributeInfo CodeAttribute { maxStack
+                                        , maxLocals = maxLocals + stackSize args
+                                        , code = toLazyByteString x
+                                        , exceptionTable = []
+                                        , attributes = []
+                                        }
+  Monad.return (a, MethodInfo { accessFlags
+                              , nameIndex
+                              , descriptorIndex
+                              , attributes = [attr]
+                              })
   where
     f [] = [[]]
     f (x:xs) = [y:ys | y <- x, ys <- f xs]
 
-execCode :: Monad m => CodeT m () i a -> m Attribute
-execCode = liftM snd . runCode
+execCode :: ( ParameterDesc parameters
+            , ReturnDesc result
+            , MonadConstantPool m
+            ) =>
+            Word16 ->
+            String ->
+            parameters ->
+            result ->
+            CodeT m () i a -> m MethodInfo
+execCode access name parameters result =
+  liftM snd . runCode access name parameters result
 
 initState :: S
-initState = S 0 0 0 0 [] 0 (return ())
+initState = S { stack = 0
+              , maxStack = 0
+              , maxLocals = 0
+              , varCount = 0
+              , varDomain = []
+              , codeLength = 0
+              , code = return ()
+              }
 
 newVar :: MonadState S m => [Int32] -> m Expr
 newVar xs = do
@@ -102,7 +141,7 @@ newVar xs = do
   put $ s { varCount = varCount + 1
           , varDomain = xs:varDomain
           }
-  return $ Expr 0 (varCount:) id
+  return $ Expr 0 (IntMap.singleton varCount 1)
 
 instance Monad m => Parameterized.Monad (CodeT m) where
   return = CodeT . Monad.return
@@ -113,7 +152,7 @@ instance MonadConstantPool m => MonadCode (CodeT m) where
   
   newtype Label (CodeT m) xs = Label Expr
 
-  aaload = simpleInsn (-2) Opcode.aaload
+  aaload = simpleInsn (-1) Opcode.aaload
   aastore = simpleInsn (-3) Opcode.aastore
   aconst_null = simpleInsn 1 Opcode.aconst_null
 
@@ -131,9 +170,11 @@ instance MonadConstantPool m => MonadCode (CodeT m) where
     3 -> insn (-1) 4 1 (tell $ singleton Opcode.astore_3)
     _ -> varInsn (-1) j Opcode.astore
 
-  baload = simpleInsn (-2) Opcode.baload
+  baload = simpleInsn (-1) Opcode.baload
 
   bastore = simpleInsn (-3) Opcode.bastore
+
+  dup = simpleInsn 1 Opcode.dup
 
   dup2 = simpleInsn 2 Opcode.dup2
 
@@ -182,9 +223,9 @@ instance MonadConstantPool m => MonadCode (CodeT m) where
           guard (size' == 3 && narrow ||
                  size' == 8 && not narrow)
           if narrow
-            then do tell $ singleton Opcode.ifne
+            then do tell $ singleton Opcode.ifeq
                     tell $ putWord16be . fromIntegral $ offset
-            else do tell $ singleton Opcode.ifeq
+            else do tell $ singleton Opcode.ifne
                     tell $ putWord16be 8
                     tell $ singleton Opcode.goto_w
                     tell $ putWord32be . fromIntegral $ offset
@@ -223,14 +264,34 @@ instance MonadConstantPool m => MonadCode (CodeT m) where
     3 -> insn (-1) 4 1 (tell $ singleton Opcode.istore_3)
     _ -> varInsn (-1) j Opcode.istore
 
-  invokevirtual typ method parameters result = CodeT $ do
-    x <- lift (lookupField (internalName typ) method dsc)
-    unCodeT (insn i 0 3 $ do
-      tell $ singleton Opcode.invokevirtual
-      tell $ putWord16be x)
+  invokeinterface typ method args result = CodeT $ do
+    x <- lift $ lookupInterfaceMethod typ method dsc
+    unCodeT (insn i 0 5 $ do
+                tell $ singleton Opcode.invokeinterface
+                tell $ putWord16be x
+                tell $ singleton . (+ 1) . fromIntegral . stackSize $ args
+                tell $ singleton 0)
     where
-      dsc = methodDesc parameters result
-      i = stackSize result - stackSize parameters
+      dsc = methodDesc args result
+      i = stackSize result - stackSize args
+
+  invokespecial typ method args result = CodeT $ do
+    x <- lift $ lookupMethod typ method dsc
+    unCodeT (insn i 0 3 $ do
+                tell $ singleton Opcode.invokespecial
+                tell $ putWord16be x)
+    where
+      dsc = methodDesc args result
+      i = stackSize result - stackSize args
+
+  invokevirtual typ method args result = CodeT $ do
+    x <- lift $ lookupMethod (internalName typ) method dsc
+    unCodeT (insn i 0 3 $ do
+                tell $ singleton Opcode.invokevirtual
+                tell $ putWord16be x)
+    where
+      dsc = methodDesc args result
+      i = stackSize result - stackSize args
 
   isub = simpleInsn (-1) Opcode.isub
 
@@ -253,12 +314,31 @@ instance MonadConstantPool m => MonadCode (CodeT m) where
           tell $ putWord16be . fromIntegral $ x
       | otherwise -> ldcInsn lookupInteger x
 
-  ldcFloat = ldcInsn lookupFloat
+  ldcFloat x = case x of
+    0 -> simpleInsn 1 Opcode.fconst_0
+    1 -> simpleInsn 1 Opcode.fconst_1
+    2 -> simpleInsn 1 Opcode.fconst_2
+    _ -> ldcInsn lookupFloat x
+
   ldcString = ldcInsn lookupString
+
   ldcClass = ldcInsn lookupClass
 
-  ldcLong = ldc2Insn lookupLong
-  ldcDouble = ldc2Insn lookupDouble
+  ldcLong x = case x of
+    0 -> simpleInsn 2 Opcode.lconst_0
+    1 -> simpleInsn 2 Opcode.lconst_1
+    _ -> ldc2Insn lookupLong x
+
+  ldcDouble x = case x of
+    0 -> simpleInsn 2 Opcode.dconst_0
+    1 -> simpleInsn 2 Opcode.dconst_1
+    _ -> ldc2Insn lookupDouble x
+
+  new typ = CodeT $ do
+    x <- lift $ lookupClass typ
+    unCodeT (insn 1 0 3 $ do
+                tell $ singleton Opcode.new
+                tell $ putWord16be x)
 
   newarray typ = insn 0 0 2 $ do
     tell $ singleton Opcode.newarray
