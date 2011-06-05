@@ -1,16 +1,18 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-} 
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Control.Monad.ConstantPool
        ( module Control.Monad.ConstantPool.Class
        , ConstantPool
        , runConstantPool
+       , ConstantPoolT
+       , runConstantPoolT
        ) where
 
 import Control.Applicative
 import Control.Monad
 import Control.Monad.ConstantPool.Class
+import Control.Monad.Identity
 import Control.Monad.State
 
 import Data.ClassFile.CpInfo
@@ -23,23 +25,30 @@ import Prelude hiding (lookup)
 deriving instance Eq CpInfo
 deriving instance Ord CpInfo
 
-data S = S { constantPoolCount :: Word16
-           , constantPool :: [CpInfo]
-           , constantPoolMap :: Map CpInfo Word16
-           } 
-
-newtype ConstantPool a = ConstantPool
-                         { unConstantPool :: State S a
-                         } deriving (Functor, Applicative, Monad, MonadFix)
+type ConstantPool = ConstantPoolT Identity
 
 runConstantPool :: ConstantPool a -> (a, Word16, [CpInfo])
-runConstantPool m = case runState (unConstantPool m) initState of
-  (a, S {..}) -> (a, constantPoolCount, reverse constantPool)
+runConstantPool = runIdentity . runConstantPoolT
+
+data S = S Word16 [CpInfo] (Map CpInfo Word16)
+
+newtype ConstantPoolT m a = ConstantPoolT
+                            { unConstantPoolT :: StateT S m a
+                            } deriving ( Functor
+                                       , Applicative
+                                       , Monad
+                                       , MonadFix
+                                       )
+
+runConstantPoolT :: Monad m => ConstantPoolT m a -> m (a, Word16, [CpInfo])
+runConstantPoolT m = do
+  (a, S n xs _) <- runStateT (unConstantPoolT m) initState
+  return (a, n, xs)
 
 initState :: S
 initState = S 1 [] Map.empty
 
-instance MonadConstantPool ConstantPool where
+instance Monad m => MonadConstantPool (ConstantPoolT m) where
   lookupClass = lookupUtf8 >=> lookup . Class
   
   lookupField typ name dsc = do
@@ -69,21 +78,20 @@ instance MonadConstantPool ConstantPool where
   
   lookupUtf8 = lookup . Utf8
 
-lookupNameAndType :: String -> String -> ConstantPool Word16
+lookupNameAndType :: Monad m => String -> String -> ConstantPoolT m Word16
 lookupNameAndType name dsc = do
   i <- lookupUtf8 name
   j <- lookupUtf8 dsc
   lookup $ NameAndType i j
 
-lookup :: CpInfo -> ConstantPool Word16
-lookup x = ConstantPool $ do
-  s@(S n xs m) <- get
+lookup :: Monad m => CpInfo -> ConstantPoolT m Word16
+lookup x = ConstantPoolT $ do
+  S n xs m <- get
   case Map.lookup x m of
     Nothing -> do
       put $ S (n + n') (x:xs) (Map.insert x n m)
       return n
-    Just i -> do
-      put s
+    Just i ->
       return i
   where
     n' = case x of
