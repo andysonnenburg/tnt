@@ -1,5 +1,8 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Control.Monad.ConstantPool
        ( module Control.Monad.ConstantPool.Class
@@ -12,8 +15,12 @@ module Control.Monad.ConstantPool
 import Control.Applicative
 import Control.Monad
 import Control.Monad.ConstantPool.Class
+import Control.Monad.Cont.Class
+import Control.Monad.Error.Class
 import Control.Monad.Identity
+import Control.Monad.Reader.Class
 import Control.Monad.State
+import Control.Monad.Writer.Class
 
 import Data.ClassFile.CpInfo
 import Data.Map (Map)
@@ -36,9 +43,18 @@ newtype ConstantPoolT m a = ConstantPoolT
                             { unConstantPoolT :: StateT S m a
                             } deriving ( Functor
                                        , Applicative
+                                       , Alternative
                                        , Monad
                                        , MonadFix
+                                       , MonadPlus
+                                       , MonadTrans
+                                       , MonadIO
+                                       , MonadCont
                                        )
+
+deriving instance MonadError e m => MonadError e (ConstantPoolT m)
+deriving instance MonadReader r m => MonadReader r (ConstantPoolT m)
+deriving instance MonadWriter w m => MonadWriter w (ConstantPoolT m)
 
 runConstantPoolT :: Monad m => ConstantPoolT m a -> m (a, Word16, [CpInfo])
 runConstantPoolT m = do
