@@ -27,7 +27,7 @@ module Control.Monad.Code.Class
        ) where
 
 import Control.Monad (forM, replicateM)
-import qualified Control.Monad.Parameterized as Parameterized
+import qualified Control.Monad.Indexed as Indexed
 
 import Data.Int hiding (Int)
 import Data.List
@@ -287,7 +287,7 @@ instance PushF Reference a where
 
 type Operation m i j = m i j (Label m i)
 
-class Parameterized.Monad m => MonadCode m where
+class Indexed.Monad m => MonadCode m where
   
   data Label m :: * -> *
   
@@ -295,35 +295,35 @@ class Parameterized.Monad m => MonadCode m where
   aastore :: Operation m (Reference, (Int, (Reference, xs))) xs
   aconst_null :: Operation m xs (Reference, xs)
   aload :: Word16 -> Operation m xs (Reference, xs)
-  -- anewarray :: Reference -> m (Cons Int xs) (Cons Reference xs) (Label m)
+  -- anewarray :: Reference -> t (Cons Int xs) (Cons Reference xs) (Label m)
   -- areturn :: m (Cons Reference xs) xs (Label m)
   -- arraylength :: m (Cons Reference xs) (Cons Int xs) (Label m)
   astore :: Word16 -> Operation m (Reference, xs) xs
-  -- athrow :: m (Cons Reference xs) xs (Label m)
+  -- athrow :: t (Cons Reference xs) xs (Label m)
   
   baload :: Operation m (Int, (Reference, xs)) (Int, xs)
   bastore :: Operation m (Int, (Int, (Reference, xs))) xs
   
-  -- caload :: m (Cons Int (Cons Reference xs)) (Cons Int xs) (Label m)
-  -- castore :: m (Cons Int (Cons Int (Cons Reference xs))) xs (Label m)
-  -- checkcast :: Reference -> m (Cons Reference xs) (Cons Reference xs) (Label m)
+  -- caload :: t (Cons Int (Cons Reference xs)) (Cons Int xs) (Label m)
+  -- castore :: t (Cons Int (Cons Int (Cons Reference xs))) xs (Label m)
+  -- checkcast :: Reference -> t (Cons Reference xs) (Cons Reference xs) (Label m)
   
-  -- d2f :: m (Cons Double xs) (Cons Float xs) (Label m)
-  -- d2i :: m (Cons Double xs) (Cons Int xs) (Label m)
-  -- d2l :: m (Cons Double xs) (Cons Long xs) (Label m)
-  -- dadd :: m (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  -- daload :: m (Cons Int (Cons Reference xs)) (Cons Double xs) (Label m)
-  -- dastore :: m (Cons Double (Cons Int (Cons Reference xs))) xs (Label m)
-  -- dcmpg :: m (Cons Double (Cons Double xs)) (Cons Int xs) (Label m)
-  -- dcmpl :: m (Cons Double (Cons Double xs)) (Cons Int xs) (Label m)
-  -- ddiv :: m (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  -- dload :: Word16 -> m xs (Cons Double xs) (Label m)
-  -- dmul :: m (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  -- dneg :: m (Cons Double xs) (Cons Double xs) (Label m)
-  -- drem :: m (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  -- dreturn :: m (Cons Double xs) xs (Label m)
-  -- dstore :: Word16 -> m xs (Cons Double xs) (Label m)
-  -- dsub :: m (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
+  -- d2f :: t (Cons Double xs) (Cons Float xs) (Label m)
+  -- d2i :: t (Cons Double xs) (Cons Int xs) (Label m)
+  -- d2l :: t (Cons Double xs) (Cons Long xs) (Label m)
+  -- dadd :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
+  -- daload :: t (Cons Int (Cons Reference xs)) (Cons Double xs) (Label m)
+  -- dastore :: t (Cons Double (Cons Int (Cons Reference xs))) xs (Label m)
+  -- dcmpg :: t (Cons Double (Cons Double xs)) (Cons Int xs) (Label m)
+  -- dcmpl :: t (Cons Double (Cons Double xs)) (Cons Int xs) (Label m)
+  -- ddiv :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
+  -- dload :: Word16 -> t xs (Cons Double xs) (Label m)
+  -- dmul :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
+  -- dneg :: t (Cons Double xs) (Cons Double xs) (Label m)
+  -- drem :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
+  -- dreturn :: t (Cons Double xs) xs (Label m)
+  -- dstore :: Word16 -> t xs (Cons Double xs) (Label m)
+  -- dsub :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
   dup :: Category value ~ One => Operation m (value, xs) (value, (value, xs))
   -- dup_x1 :: ( Category value1 ~ One
   --           , Category value2 ~ One
@@ -342,16 +342,16 @@ class Parameterized.Monad m => MonadCode m where
   dup2 :: (value ~ Take Two xs) => Operation m xs (Concat value xs)
   -- dup2_x1 :: ( value1 ~ Take Two xs
   --            , (value2, xs') ~ SplitAt Three xs
-  --            ) => m xs (Concat value2 (Concat value1 xs')) (Label m)
+  --            ) => t xs (Concat value2 (Concat value1 xs')) (Label m)
   -- dup2_x2 :: ( value1 ~ Take Two xs
   --            , (value2, xs') ~ SplitAt Four xs
-  --            ) => m xs (Concat value2 (Concat value1 xs')) (Label m)
+  --            ) => t xs (Concat value2 (Concat value1 xs')) (Label m)
              
   -- getfield :: Type value =>
   --             String ->
   --             String ->
   --             value ->
-  --             m xs (Push value (Pop Reference xs)) (Label m)
+  --             t xs (Push value (Pop Reference xs)) (Label m)
   getstatic :: FieldType value =>
                String ->
                String ->
@@ -364,7 +364,7 @@ class Parameterized.Monad m => MonadCode m where
   
   iadd :: Operation m (Int, (Int, xs)) (Int, xs)
   
-  iinc :: Word16 -> Int16 -> Operation m xs xs
+  iinc :: Word16 -> Int32 -> Operation m xs xs
   
   ifeq :: Label m xs -> Operation m (Int, xs) xs
   
@@ -377,8 +377,7 @@ class Parameterized.Monad m => MonadCode m where
                      String ->
                      args ->
                      result ->
-                     Operation m xs
-                     (Push result (Pop Reference (Pop args xs)))
+                     Operation m xs (Push result (Pop Reference (Pop args xs)))
   invokespecial :: ( ParameterDesc args
                    , ReturnDesc result
                    ) =>

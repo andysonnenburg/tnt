@@ -59,7 +59,7 @@ deriving instance MonadWriter w m => MonadWriter w (ConstantPoolT m)
 runConstantPoolT :: Monad m => ConstantPoolT m a -> m (a, Word16, [CpInfo])
 runConstantPoolT m = do
   (a, S n xs _) <- runStateT (unConstantPoolT m) initState
-  return (a, n, xs)
+  return (a, n, reverse xs)
 
 initState :: S
 initState = S 1 [] Map.empty
@@ -107,7 +107,7 @@ lookup x = ConstantPoolT $ do
     Nothing -> do
       put $ S (n + n') (x:xs) (Map.insert x n m)
       return n
-    Just i ->
+    Just i -> 
       return i
   where
     n' = case x of

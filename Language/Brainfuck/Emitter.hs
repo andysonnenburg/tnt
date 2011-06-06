@@ -5,8 +5,8 @@ module Language.Brainfuck.Emitter (emit) where
 import Control.Monad (forM_)
 import Control.Monad.Fix
 import Control.Monad.Code.Class
-import Control.Monad.Parameterized hiding (return)
-import qualified Control.Monad.Parameterized as M
+import Control.Monad.Indexed hiding (return)
+import qualified Control.Monad.Indexed as M
 
 import Language.Brainfuck.Command
 

@@ -6,7 +6,7 @@ import Control.Applicative
 import qualified Control.Monad as Monad
 import Control.Monad.Code
 import Control.Monad.ConstantPool
-import Control.Monad.Parameterized hiding (return)
+import Control.Monad.Indexed hiding (return)
 
 import Data.Binary.Put
 import Data.Bits

@@ -53,6 +53,7 @@ executable jfuck
                , template-haskell
                , mtl
                , utf8-string
+               , logict
   other-modules: Language.Brainfuck.Lexer, Language.Brainfuck.Parser
   build-tools: alex, happy
   ghc-options: -Wall -fno-warn-missing-signatures -O3 -rtsopts
