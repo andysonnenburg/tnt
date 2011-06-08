@@ -1,3 +1,4 @@
+{-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -20,6 +21,10 @@ import Data.Word
 import Prelude hiding (Double, Float, Int, return)
 import qualified Prelude
 
+class ReturnAddressOrReference a
+instance ReturnAddressOrReference ReturnAddress
+instance ReturnAddressOrReference Reference
+
 class CategoryF a where
   type Category a
 
@@ -34,6 +39,9 @@ instance CategoryF Float where
   
 instance CategoryF Double where
   type Category Double = Two
+
+instance CategoryF ReturnAddress where
+  type Category ReturnAddress = One
 
 instance CategoryF Reference where
   type Category Reference = One
@@ -144,7 +152,9 @@ class Indexed.Monad m => MonadCode m where
   -- anewarray :: Reference -> t (Cons Int xs) (Cons Reference xs) (Label m)
   -- areturn :: m (Cons Reference xs) xs (Label m)
   -- arraylength :: m (Cons Reference xs) (Cons Int xs) (Label m)
-  astore :: Word16 -> Operation m (Reference, xs) xs
+  astore :: ReturnAddressOrReference objectref =>
+            Word16 ->
+	    Operation m (objectref, xs) xs
   -- athrow :: t (Cons Reference xs) xs (Label m)
   
   baload :: Operation m (Int, (Reference, xs)) (Int, xs)
@@ -198,7 +208,7 @@ class Indexed.Monad m => MonadCode m where
   --             String ->
   --             value ->
   --             t xs (Push value (Pop Reference xs)) (Label m)
-  getstatic :: FieldType value =>
+  getstatic :: FieldDesc value =>
                String ->
                String ->
                value ->

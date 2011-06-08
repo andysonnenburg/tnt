@@ -1,3 +1,4 @@
+{-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -11,7 +12,7 @@ module Data.ClassFile.Desc
        , ReturnAddress ()
        , Reference (..)
        , Void (..)
-       , FieldType ()
+       , FieldDesc ()
        , ParameterDesc ()
        , ReturnDesc ()
        , desc
@@ -21,7 +22,7 @@ module Data.ClassFile.Desc
        , internalName
        ) where
 
-import Control.Monad (forM, replicateM)
+import Control.Monad
 
 import Data.List
 import Data.Word
@@ -84,62 +85,55 @@ instance Desc () where
   descs _ = id
   stackSize _ = 0
 
-class Desc a => FieldType a where
-instance FieldType Int where
-instance FieldType Long where
-instance FieldType Float where
-instance FieldType Double where
-instance FieldType Reference where
+class Desc a => FieldType a
+instance FieldType Int
+instance FieldType Long
+instance FieldType Float
+instance FieldType Double
+instance FieldType Reference
 
-class FieldType a => ComponentType a where
-instance FieldType a => ComponentType a where
-  
-class Desc a => ParameterDesc a where
-instance ParameterDesc Int where
-instance ParameterDesc Long where
-instance ParameterDesc Float where
-instance ParameterDesc Double where
-instance ParameterDesc Reference where
-instance ParameterDesc () where
+class FieldType a => ComponentType a
+instance FieldType a => ComponentType a
 
-$(forM [2 :: Word8 .. fromIntegral maxTupleSize] $ \i -> do
-  let i' = fromIntegral i
+class FieldType a => FieldDesc a
+instance FieldType a => FieldDesc a
   
-  names <- replicateM i' (newName "a")
-  
-  let tvs = map varT names
-      ctxt = cxt . map (classP ''FieldType . (:[])) $ tvs
-      typ = appT (conT ''Desc) . foldl' appT (tupleT i') $ tvs
-  
-  let
-    p = tupP . map varP $ names
-    es = map varE names
-    
-    descsDec =
-      let
-        xs = map (\e -> [| descs $e |]) es
-        g = foldr1 (\a b -> [| $a . $b |]) xs
-      in funD 'descs [clause [p] (normalB g) []]
-     
-    stackSizeDec =
-      let
-        xs = map (\e -> [| stackSize $e |]) es
-        g = foldl1' (\a b -> [| ($a :: Word16) + $b |]) xs
-      in funD 'stackSize [clause [p] (normalB g) []]
+class Desc a => ParameterDesc a
+instance ParameterDesc Int
+instance ParameterDesc Long
+instance ParameterDesc Float
+instance ParameterDesc Double
+instance ParameterDesc Reference
+instance ParameterDesc ()
 
-  instanceD ctxt typ [descsDec, stackSizeDec])
-
-  
-$(forM [2 :: Word8 .. fromIntegral maxTupleSize] $ \i -> do
-  let i' = fromIntegral i
-      
-  names <- replicateM i' (newName "a")
+$(liftM concat $ forM [2 .. min 255 maxTupleSize] $ \i -> do  
+  names <- replicateM i (newName "a")
   
   let tvs = map varT names
       ctxt = cxt . map (\tv -> classP ''FieldType [tv]) $ tvs
-      typ = appT (conT ''ParameterDesc) . foldl' appT (tupleT i') $ tvs
+      tupleTyp = foldl' appT (tupleT i) $ tvs
+  
+  let
+    p = tupP . map varP $ names
+    es = map varE names    
 
-  instanceD ctxt typ [])
+    descTyp = appT (conT ''Desc) tupleTyp
+
+    descsDec = funD 'descs [clause [p] (normalB g) []]
+      where
+        xs = map (\e -> [| descs $e |]) es
+        g = foldr1 (\a b -> [| $a . $b |]) xs
+     
+    stackSizeDec = funD 'stackSize [clause [p] (normalB g) []]
+      where
+        xs = map (\e -> [| stackSize $e |]) es
+        g = foldl1' (\a b -> [| ($a :: Word16) + $b |]) xs
+ 
+    parameterDescTyp = appT (conT ''ParameterDesc) tupleTyp
+
+  sequence [ instanceD ctxt descTyp [descsDec, stackSizeDec]
+  	   , instanceD ctxt parameterDescTyp []
+  	   ])
 
 class Desc a => ReturnDesc a where
 instance ReturnDesc Int where
