@@ -55,7 +55,8 @@ executable bf
                , mtl
                , utf8-string
                , data-binary-ieee754
+               , cmdargs
+               , filepath
   other-modules: Language.Brainfuck.Lexer, Language.Brainfuck.Parser
   build-tools: alex, happy
   ghc-options: -Wall -O3 -funbox-strict-fields -rtsopts
-  

@@ -9,15 +9,18 @@ module Data.ClassFile.Access
        , protected
        , static
        , final
+       , super
        , synchronized
        , volatile
        , bridge
        , transient
        , varargs
        , native
+       , interface
        , abstract
        , strict
        , synthetic
+       , annotation
        , enum
        ) where
 
@@ -56,6 +59,9 @@ static = Access 0x0008
 final :: Access
 final = Access 0x0010
 
+super :: Access
+super = Access 0x0020
+
 synchronized :: Access
 synchronized = Access 0x0020
 
@@ -74,6 +80,9 @@ varargs = Access 0x0080
 native :: Access
 native = Access 0x0100
 
+interface :: Access
+interface = Access 0x0200
+
 abstract :: Access
 abstract = Access 0x0400
 
@@ -82,6 +91,9 @@ strict = Access 0x0800
 
 synthetic :: Access
 synthetic = Access 0x1000
+
+annotation :: Access
+annotation = Access 0x2000
 
 enum :: Access
 enum = Access 0x4000

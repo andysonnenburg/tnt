@@ -28,7 +28,9 @@ compile className = liftM f . parse
 
 toClassFile :: String -> Code s () i a -> ClassFile
 toClassFile className x =
-  classM 50 (fromList [public, final]) className (Just "java/lang/Object")
+  classM 49 (fromList [ public
+                      , final
+                      , super]) className (Just "java/lang/Object")
     ["java/lang/Runnable"]
     []
     [ execCode
