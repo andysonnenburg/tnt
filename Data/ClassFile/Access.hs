@@ -1,5 +1,10 @@
 module Data.ClassFile.Access
-       ( public
+       ( Access (..)
+       , AccessSet
+       , fromList
+       , fromFlags
+       , toFlags
+       , public
        , private
        , protected
        , static
@@ -8,27 +13,49 @@ module Data.ClassFile.Access
        , transient
        ) where
 
+import Data.Bits
+import Data.List
 import Data.Word
 
-newtype AccessFlags = AccessFlags { unAccessFlags :: Word16}
+data Access = Public
+            | Private
+            | Protected
+            | Static
+            | Final
+            | Volatile
+            | Transient deriving Enum
 
-public :: Word16
-public = 0x0001
+newtype AccessSet = AccessSet { unAccessSet :: Word16}
 
-private :: Word16
-private = 0x0002
+toFlag :: Access -> Word16
+toFlag = shiftL 1 . fromEnum
 
-protected :: Word16
-protected = 0x0004
+fromList :: [Access] -> AccessSet
+fromList = AccessSet . foldl' ((. toFlag) . (.|.)) 0
 
-static :: Word16
-static = 0x0008
+fromFlags :: Word16 -> AccessSet
+fromFlags = AccessSet
 
-final :: Word16
-final = 0x0010
+toFlags :: AccessSet -> Word16
+toFlags = unAccessSet
 
-volatile :: Word16
-volatile = 0x0040
+public :: Access
+public = Public
 
-transient :: Word16
-transient = 0x0080
+private :: Access
+private = Private
+
+protected :: Access
+protected = Protected
+
+static :: Access
+static = Static
+
+final :: Access
+final = Final
+
+volatile :: Access
+volatile = Volatile
+
+transient :: Access
+transient = Transient

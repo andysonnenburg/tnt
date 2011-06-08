@@ -21,20 +21,17 @@ module Control.Monad.Code
 
 import Control.Applicative hiding (Const)
 import Control.Monad hiding (return)
-import qualified Control.Monad as Monad
 import Control.Monad.Code.Class hiding (Int (..), return)
 import qualified Control.Monad.Code.Class
 import qualified Control.Monad.Code.Opcode as Opcode
 import Control.Monad.ConstantPool.Class
 import Control.Monad.Fix
 import qualified Control.Monad.Indexed as Indexed
-import Control.Monad.List
 import Control.Monad.State
 
 import Data.Binary.Put
-import Data.ClassFile.Attribute
-import Data.ClassFile.CodeAttribute (CodeAttribute (CodeAttribute))
-import qualified Data.ClassFile.CodeAttribute
+import Data.ClassFile
+import Data.ClassFile.Access
 import Data.ClassFile.MethodInfo
 import Data.Int
 import Data.Word
@@ -62,34 +59,24 @@ runCode :: forall s parameters result m i a.
            , ReturnDesc result
            , MonadConstantPool m
            ) =>
-           Word16 ->
+           AccessSet ->
            String ->
            parameters ->
            result ->
            CodeT s m () i a ->
            m (a, MethodInfo)
-runCode accessFlags name args result (CodeT m) = do
-  nameIndex <- lookupUtf8 name
-  descriptorIndex <- lookupUtf8 (methodDesc args result)
-  (a, S {..}) <- runStateT m initState
-  attr <- toAttributeInfo CodeAttribute { maxStack
-                                        , maxLocals = maxLocals + stackSize args
-                                        , code = runPut code
-                                        , exceptionTable = []
-                                        , attributes = []
-                                        }
-  Monad.return (a, MethodInfo { accessFlags
-                              , nameIndex
-                              , descriptorIndex
-                              , attributes = [attr]
-                              })
+runCode access name args result (CodeT m) = do
+  (a, S _ ms ml _ c) <- runStateT m initState
+  let codeAttribute = codeAttributeM ms (ml + stackSize args) (runPut c)
+  method <- methodM access name args result [codeAttribute]
+  return (a, method)
 
 execCode :: forall s parameters result m i a.
             ( ParameterDesc parameters
             , ReturnDesc result
             , MonadConstantPool m
             ) =>
-            Word16 ->
+            AccessSet ->
             String ->
             parameters ->
             result ->
@@ -107,7 +94,7 @@ initState = S { stack = 0
 
 instance Monad m => Indexed.Monad (CodeT s m) where
   m >>= k = CodeT $ unCodeT m >>= unCodeT . k
-  
+
   m >> n = CodeT $ unCodeT m >> unCodeT n
   
   return = CodeT . return
@@ -122,19 +109,19 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
   aastore = insn (-3) Opcode.aastore
   aconst_null = insn 1 Opcode.aconst_null
 
-  aload j = case j of
+  aload var = case var of
     0 -> insn' 1 1 1 $ putWord8 Opcode.aload_0
     1 -> insn' 1 2 1 $ putWord8 Opcode.aload_1
     2 -> insn' 1 3 1 $ putWord8 Opcode.aload_2
     3 -> insn' 1 4 1 $ putWord8 Opcode.aload_3
-    _ -> varInsn 1 j Opcode.aload
+    _ -> varInsn 1 var Opcode.aload
 
-  astore j = case j of
+  astore var = case var of
     0 -> insn' (-1) 1 1 $ putWord8 Opcode.astore_0
     1 -> insn' (-1) 2 1 $ putWord8 Opcode.astore_1
     2 -> insn' (-1) 3 1 $ putWord8 Opcode.astore_2
     3 -> insn' (-1) 4 1 $ putWord8 Opcode.astore_3
-    _ -> varInsn (-1) j Opcode.astore
+    _ -> varInsn (-1) var Opcode.astore
 
   baload = insn (-1) Opcode.baload
 
@@ -189,12 +176,18 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
         putWord8 Opcode.iinc
         putWord8 . fromIntegral $ local
         putWord8 . fromIntegral $ cnst
-    | otherwise =
+    | cnst >= fromIntegral (minBound :: Int16) &&
+      cnst <= fromIntegral (maxBound :: Int16) =
       insn' 0 local 6 $ do
         putWord8 Opcode.wide
         putWord8 Opcode.iinc
         putWord16be local
         putWord16be . fromIntegral $ cnst
+    | otherwise = iload local Indexed.>>= \label ->
+                  ldc cnst Indexed.>>
+                  iadd Indexed.>>
+                  istore local Indexed.>>
+                  return label
 
   iload j = case j of
     0 -> insn' 1 1 1 $ putWord8 Opcode.iload_0
@@ -203,12 +196,12 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
     3 -> insn' 1 4 1 $ putWord8 Opcode.iload_3
     _ -> varInsn 1 j Opcode.iload
 
-  istore j = case j of
+  istore var = case var of
     0 -> insn' (-1) 1 1 $ putWord8 Opcode.istore_0
     1 -> insn' (-1) 2 1 $ putWord8 Opcode.istore_1
     2 -> insn' (-1) 3 1 $ putWord8 Opcode.istore_2
     3 -> insn' (-1) 4 1 $ putWord8 Opcode.istore_3
-    _ -> varInsn (-1) j Opcode.istore
+    _ -> varInsn (-1) var Opcode.istore
 
   invokeinterface typ method args result = CodeT $ do
     x <- lift $ lookupInterfaceMethod typ method dsc
@@ -327,14 +320,14 @@ varInsn :: Monad m =>
            Word16 ->
            Word8 ->
            CodeT s m i j (Label (CodeT s m) i)
-varInsn i local opcode
-  | local < fromIntegral (maxBound :: Word8) = insn' i (local + 1) 2 $ do
+varInsn i var opcode
+  | var < fromIntegral (maxBound :: Word8) = insn' i (var + 1) 2 $ do
     putWord8 opcode
-    putWord8 . fromIntegral $ local
-  | otherwise = insn' i (local + 1) 3 $ do
+    putWord8 . fromIntegral $ var
+  | otherwise = insn' i (var + 1) 3 $ do
     putWord8 Opcode.wide
     putWord8 opcode
-    putWord16be local
+    putWord16be var
 
 ldcInsn :: MonadConstantPool m =>
            (a -> m Word16) ->

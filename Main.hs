@@ -1,15 +1,13 @@
-{-# LANGUAGE NamedFieldPuns, RebindableSyntax #-}
+{-# LANGUAGE RebindableSyntax #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Main (main) where
 
 import Control.Applicative
 import qualified Control.Monad as Monad
 import Control.Monad.Code
-import Control.Monad.ConstantPool
 import Control.Monad.Indexed hiding (return)
 
 import Data.Binary.Put
-import Data.Bits
 import qualified Data.ByteString.Lazy as BL
 import Data.ClassFile
 import Data.ClassFile.Access
@@ -29,8 +27,7 @@ main = BL.getContents Monad.>>=
        (putBinary .
         runPut .
         putClassFile .
-        f .
-        execCode (public .|. final) "run" ()V .
+        toClassFile .
         emit .
         optimize) .
        parse
@@ -38,36 +35,29 @@ main = BL.getContents Monad.>>=
     putBinary s = hSetBinaryMode stdout True *>
                   BL.putStr s <*
                   hSetBinaryMode stdout False
-                  
-    initMethod = execCode
-      public "<init>" ()V $ do
-        aload 0
-        invokespecial "java/lang/Object" "<init>" ()V
-        return
     
-    mainMethod = execCode
-      (public .|. static .|. final) "main" (A(L"java/lang/String"))V $ do
-        new "Main"
-        dup
-        invokespecial "Main" "<init>" ()V
-        invokevirtual (L"Main") "run" ()V
-        return
-        
-    f runMethod = ClassFile { minorVersion = 0
-                            , majorVersion = 50
-                            , constantPoolLength
-                            , constantPool
-                            , accessFlags = public .|. final
-                            , thisClass
-                            , superClass
-                            , interfaces = []
-                            , fields = []
-                            , methods
-                            , attributes = []
-                            }
-      where
-        ((thisClass, superClass, methods), constantPoolLength, constantPool) =
-          runConstantPool ((,,)
-                           <$> lookupClass "Main"
-                           <*> lookupClass "java/lang/Object"
-                           <*> sequence [runMethod, initMethod, mainMethod])
+    toClassFile x =
+      classM (fromList [public, final]) "Main" (Just "java/lang/Object")
+      []
+      []
+      [ execCode
+        (fromList [public]) "<init>" ()V $ do
+          aload 0
+          invokespecial "java/lang/Object" "<init>" ()V
+          return
+      
+      , execCode
+        (fromList [ public
+                  , static
+                  , final
+                  ]) "main" (A$L"java/lang/String")V $ do
+          new "Main"
+          dup
+          invokespecial "Main" "<init>" ()V
+          invokevirtual (L"Main") "run" ()V
+          return
+      
+      , execCode (fromList [public, final]) "run" ()V x
+      
+      ]
+      []

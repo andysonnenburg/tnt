@@ -4,6 +4,7 @@ module Data.ClassFile.CpInfo
        , putCpInfo
        ) where
 
+import Data.Binary.IEEE754
 import Data.Binary.Put
 import qualified Data.ByteString.Lazy as BL
 import Data.Int
@@ -38,7 +39,7 @@ data CpInfo = Class
               }
             | Utf8
               { bytes :: String
-              }
+              } deriving (Eq, Ord)
 
 putCpInfo :: CpInfo -> Put
 putCpInfo x = case x of
@@ -60,7 +61,18 @@ putCpInfo x = case x of
   String {..} -> do
     putWord8 8
     putWord16be stringIndex
-  
+  Integer y -> do
+    putWord8 3
+    putWord32be . fromIntegral $ y
+  Float y -> do
+    putWord8 4
+    putFloat32be y
+  Long y -> do
+    putWord8 5
+    putWord64be . fromIntegral $ y
+  Double y -> do
+    putWord8 6
+    putFloat64be y
   NameAndType {..} -> do
     putWord8 12
     putWord16be nameIndex

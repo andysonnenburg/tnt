@@ -20,6 +20,7 @@ import Control.Monad.Error.Class
 import Control.Monad.Identity
 import Control.Monad.Reader.Class
 import Control.Monad.State
+import Control.Monad.Version.Class
 import Control.Monad.Writer.Class
 
 import Data.ClassFile.CpInfo
@@ -28,9 +29,6 @@ import qualified Data.Map as Map
 import Data.Word
 
 import Prelude hiding (lookup)
-
-deriving instance Eq CpInfo
-deriving instance Ord CpInfo
 
 type ConstantPool = ConstantPoolT Identity
 
@@ -55,6 +53,10 @@ newtype ConstantPoolT m a = ConstantPoolT
 deriving instance MonadError e m => MonadError e (ConstantPoolT m)
 deriving instance MonadReader r m => MonadReader r (ConstantPoolT m)
 deriving instance MonadWriter w m => MonadWriter w (ConstantPoolT m)
+
+instance MonadVersion m => MonadVersion (ConstantPoolT m) where
+  getMinorVersion = ConstantPoolT . lift $ getMinorVersion
+  getMajorVersion = ConstantPoolT . lift $ getMajorVersion
 
 runConstantPoolT :: Monad m => ConstantPoolT m a -> m (a, Word16, [CpInfo])
 runConstantPoolT m = do
