@@ -105,34 +105,37 @@ instance ParameterDesc Double
 instance ParameterDesc Reference
 instance ParameterDesc ()
 
-$(liftM concat $ forM [2 .. min 255 maxTupleSize] $ \i -> do  
-  names <- replicateM i (newName "a")
+$(do
+  let n = min 255 maxTupleSize
+  names <- replicateM n $ newName "a"
+  liftM concat $ forM [2 .. n] $ \i -> do
   
-  let tvs = map varT names
-      ctxt = cxt . map (\tv -> classP ''FieldType [tv]) $ tvs
-      tupleTyp = foldl' appT (tupleT i) $ tvs
+    let names' = take i names
+        tvs = map varT names'
+        ctxt = cxt . map (\tv -> classP ''FieldType [tv]) $ tvs
+        tupleTyp = foldl' appT (tupleT i) $ tvs
   
-  let
-    p = tupP . map varP $ names
-    es = map varE names
+    let
+      p = tupP . map varP $ names'
+      es = map varE names'
 
-    descTyp = appT (conT ''Desc) tupleTyp
+      descTyp = appT (conT ''Desc) tupleTyp
 
-    descsDec = funD 'descs [clause [p] (normalB g) []]
-      where
-        xs = map (\e -> [| descs $e |]) es
-        g = foldr1 (\a b -> [| $a . $b |]) xs
-     
-    stackSizeDec = funD 'stackSize [clause [p] (normalB g) []]
-      where
-        xs = map (\e -> [| stackSize $e |]) es
-        g = foldl1' (\a b -> [| ($a :: Word16) + $b |]) xs
- 
-    parameterDescTyp = appT (conT ''ParameterDesc) tupleTyp
+      descsDec = funD 'descs [clause [p] (normalB g) []]
+        where
+          xs = map (\e -> [| descs $e |]) es
+          g = foldr1 (\a b -> [| $a . $b |]) xs
 
-  sequence [ instanceD ctxt descTyp [descsDec, stackSizeDec]
-  	   , instanceD ctxt parameterDescTyp []
-  	   ])
+      stackSizeDec = funD 'stackSize [clause [p] (normalB g) []]
+        where
+          xs = map (\e -> [| stackSize $e |]) es
+          g = foldl1' (\a b -> [| ($a :: Word16) + $b |]) xs
+
+      parameterDescTyp = appT (conT ''ParameterDesc) tupleTyp
+
+    sequence [ instanceD ctxt descTyp [descsDec, stackSizeDec]
+             , instanceD ctxt parameterDescTyp []
+             ])
 
 class Desc a => ReturnDesc a where
 instance ReturnDesc Int where
