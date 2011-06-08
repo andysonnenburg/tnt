@@ -37,7 +37,7 @@ main = BL.getContents Monad.>>=
                   hSetBinaryMode stdout False
     
     toClassFile x =
-      classM (fromList [public, final]) "Main" (Just "java/lang/Object")
+      classM 50 (fromList [public, final]) "Main" (Just "java/lang/Object")
       []
       []
       [ execCode

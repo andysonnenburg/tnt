@@ -42,8 +42,9 @@ Build-type:          Simple
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.2
 
+library
 
-executable jfuck
+executable bf
   main-is: Main.hs
   build-depends: base >= 4
                , bytestring

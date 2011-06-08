@@ -10,6 +10,8 @@ module Data.ClassFile
 
 import Control.Monad
 import Control.Monad.ConstantPool
+import Control.Monad.Trans
+import Control.Monad.Version
 
 import Data.Binary.Put
 import Data.ByteString.Lazy (ByteString)
@@ -55,9 +57,10 @@ putClassFile ClassFile {..} = do
   putWord16be . fromIntegral . length $ attributes
   forM_ attributes putAttributeInfo
 
-type M a = ConstantPool a
+type M = ConstantPoolT Version
 
-classM :: AccessSet ->
+classM :: Word16 ->
+          AccessSet ->
           String ->
           Maybe String ->
           [String] ->
@@ -65,30 +68,39 @@ classM :: AccessSet ->
           [M MethodInfo] ->
           [M AttributeInfo] ->
           ClassFile
-classM access thisClass superClass interfaces fields methods attributes = a
+classM
+  version
+  access
+  thisClass
+  superClass
+  interfaces
+  fields
+  methods
+  attributes = a
   where
-    (a, constantPoolLength, constantPool) = runConstantPool $ do
-      let minorVersion = 0
-          majorVersion = 49
-          accessFlags = toFlags access
-      thisClass <- lookupClass thisClass
-      superClass <- maybe (return 0) lookupClass superClass
-      interfaces <- mapM lookupClass interfaces
-      fields <- sequence fields
-      methods <- sequence methods
-      attributes <- sequence attributes
-      return ClassFile { minorVersion
-                       , majorVersion
-                       , accessFlags
-                       , constantPoolLength
-                       , constantPool
-                       , thisClass
-                       , superClass
-                       , interfaces
-                       , fields
-                       , methods
-                       , attributes
-                       }    
+    (a, constantPoolLength, constantPool) =
+      (\m -> runVersion m 0 version) . runConstantPoolT $ do
+        let minorVersion = 0
+        majorVersion <- lift $ getMajorVersion
+        let accessFlags = toFlags access
+        thisClass <- lookupClass thisClass
+        superClass <- maybe (return 0) lookupClass superClass
+        interfaces <- mapM lookupClass interfaces
+        fields <- sequence fields
+        methods <- sequence methods
+        attributes <- sequence attributes
+        return ClassFile { minorVersion
+                         , majorVersion
+                         , accessFlags
+                         , constantPoolLength
+                         , constantPool
+                         , thisClass
+                         , superClass
+                         , interfaces
+                         , fields
+                         , methods
+                         , attributes
+                         }
 
 methodM :: ( ParameterDesc args
            , ReturnDesc result
