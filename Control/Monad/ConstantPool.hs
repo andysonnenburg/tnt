@@ -35,7 +35,7 @@ type ConstantPool = ConstantPoolT Identity
 runConstantPool :: ConstantPool a -> (a, Word16, [CpInfo])
 runConstantPool = runIdentity . runConstantPoolT
 
-data S = S Word16 [CpInfo] (Map CpInfo Word16)
+data S = S {-# UNPACK #-} !Word16 ![CpInfo] !(Map CpInfo Word16)
 
 newtype ConstantPoolT m a = ConstantPoolT
                             { unConstantPoolT :: StateT S m a
@@ -72,17 +72,17 @@ instance Monad m => MonadConstantPool (ConstantPoolT m) where
   lookupField typ name dsc = do
     i <- lookupClass typ
     j <- lookupNameAndType name dsc
-    lookup (Fieldref i j)
+    lookup $! Fieldref i j
   
   lookupMethod typ name dsc = do
     i <- lookupClass typ
     j <- lookupNameAndType name dsc
-    lookup (Methodref i j)
+    lookup $! Methodref i j
     
   lookupInterfaceMethod typ name dsc = do
     i <- lookupClass typ
     j <- lookupNameAndType name dsc
-    lookup (InterfaceMethodref i j)
+    lookup $! InterfaceMethodref i j
   
   lookupString = lookupUtf8 >=> lookup . String
   
@@ -100,14 +100,14 @@ lookupNameAndType :: Monad m => String -> String -> ConstantPoolT m Word16
 lookupNameAndType name dsc = do
   i <- lookupUtf8 name
   j <- lookupUtf8 dsc
-  lookup $ NameAndType i j
+  lookup $! NameAndType i j
 
 lookup :: Monad m => CpInfo -> ConstantPoolT m Word16
 lookup x = ConstantPoolT $ do
   S n xs m <- get
   case Map.lookup x m of
     Nothing -> do
-      put $ S (n + n') (x:xs) (Map.insert x n m)
+      put $! S (n + n') (x:xs) (Map.insert x n m)
       return n
     Just i -> 
       return i

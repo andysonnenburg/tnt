@@ -33,8 +33,8 @@ newtype VersionT m a = VersionT
                                   , MonadTrans
                                   )
                                   
-data R = R { minorVersion :: Word16
-           , majorVersion :: Word16
+data R = R { minorVersion :: {-# UNPACK #-} !Word16
+           , majorVersion :: {-# UNPACK #-} !Word16
            }
 
 runVersionT :: VersionT m a -> Word16 -> Word16 -> m a

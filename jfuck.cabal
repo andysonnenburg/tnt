@@ -57,5 +57,5 @@ executable bf
                , data-binary-ieee754
   other-modules: Language.Brainfuck.Lexer, Language.Brainfuck.Parser
   build-tools: alex, happy
-  ghc-options: -Wall -O3
+  ghc-options: -Wall -O3 -funbox-strict-fields -rtsopts
   
