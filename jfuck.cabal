@@ -56,5 +56,5 @@ executable jfuck
                , data-binary-ieee754
   other-modules: Language.Brainfuck.Lexer, Language.Brainfuck.Parser
   build-tools: alex, happy
-  ghc-options: -Wall -fno-warn-missing-signatures -O3 -rtsopts
+  ghc-options: -Wall -O3
   

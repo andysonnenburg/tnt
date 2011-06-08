@@ -21,6 +21,7 @@ emit xs = do
   emitFooter
   M.return label
 
+emitHeader :: MonadCode m => m i i (Label m i)
 emitHeader = do
   label <- ldc 30000
   newarray T_BYTE
@@ -29,6 +30,7 @@ emitHeader = do
   istore 2
   M.return label
 
+emitCommand :: (MonadCode m, MonadFix (m i i)) => Command -> m i i (Label m i)
 emitCommand (IncrementPointer x) = iinc 2 x
 emitCommand (IncrementByte x) = do
   label <- aload 1
@@ -78,6 +80,7 @@ emitCommand (WhileNonzero xs) = do
       end <- nop
     M.return start -}
 
+emitFooter :: MonadCode m => m i i (Label m i)
 emitFooter = do
   getstatic "java/lang/System" "out" (L"java/io/PrintStream")
   invokevirtual (L"java/io/PrintStream") "flush" ()V

@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns, RecordWildCards #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module Data.ClassFile
        ( ClassFile (..)
        , putClassFile

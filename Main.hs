@@ -45,7 +45,6 @@ main = BL.getContents Monad.>>=
           aload 0
           invokespecial "java/lang/Object" "<init>" ()V
           return
-      
       , execCode
         (fromList [ public
                   , static
@@ -56,8 +55,6 @@ main = BL.getContents Monad.>>=
           invokespecial "Main" "<init>" ()V
           invokevirtual (L"Main") "run" ()V
           return
-      
       , execCode (fromList [public, final]) "run" ()V x
-      
       ]
       []
