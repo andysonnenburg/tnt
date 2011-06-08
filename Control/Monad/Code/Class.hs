@@ -8,6 +8,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Code.Class
        ( module Data.ClassFile.Desc
+       , ArrayType (..)
        , MonadCode (..)
        , ldc
        ) where
@@ -140,6 +141,15 @@ instance PushF Reference a where
   type Push Reference a = (Reference, a)
 
 type Operation m i j = m i j (Label m i)
+
+data ArrayType = T_BOOLEAN
+               | T_CHAR
+               | T_FLOAT
+               | T_DOUBLE
+               | T_BYTE
+               | T_SHORT
+               | T_INT
+               | T_LONG
 
 class Indexed.Monad m => MonadCode m where
   

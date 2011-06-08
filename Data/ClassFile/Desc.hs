@@ -4,8 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Data.ClassFile.Desc
-       ( ArrayType (..)
-       , Int (..)
+       ( Int (..)
        , Long (..)
        , Float (..)
        , Double (..)
@@ -115,7 +114,7 @@ $(liftM concat $ forM [2 .. min 255 maxTupleSize] $ \i -> do
   
   let
     p = tupP . map varP $ names
-    es = map varE names    
+    es = map varE names
 
     descTyp = appT (conT ''Desc) tupleTyp
 
@@ -149,12 +148,3 @@ methodDesc a b = (showChar '(' . descs a . showChar ')' . descs b) ""
 internalName :: Reference -> String
 internalName (L x) = x  
 internalName (A x) = (showChar '[' . descs x) ""
-
-data ArrayType = T_BOOLEAN
-               | T_CHAR
-               | T_FLOAT
-               | T_DOUBLE
-               | T_BYTE
-               | T_SHORT
-               | T_INT
-               | T_LONG
