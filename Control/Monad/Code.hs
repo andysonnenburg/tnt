@@ -224,7 +224,7 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
       i = stackSize result - stackSize args
 
   invokevirtual typ method args result = CodeT $ do
-    x <- lift $ lookupMethod (internalName typ) method dsc
+    x <- lift $ lookupMethod typ method dsc
     unCodeT $ insn' i 0 3 $ do
       putWord8 Opcode.invokevirtual
       putWord16be x

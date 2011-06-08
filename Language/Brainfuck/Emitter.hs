@@ -47,13 +47,13 @@ emitCommand OutputByte = do
   aload 1
   iload 2
   baload
-  invokevirtual (L"java/io/PrintStream") "write" (I)V
+  invokevirtual "java/io/PrintStream" "write" (I)V
   M.return label
 emitCommand InputByte = do
   label <- aload 1
   iload 2
   getstatic "java/lang/System" "in" (L"java/io/InputStream")
-  invokevirtual (L"java/io/InputStream") "read" ()I
+  invokevirtual "java/io/InputStream" "read" ()I
   i2b
   bastore
   M.return label
@@ -83,5 +83,5 @@ emitCommand (WhileNonzero xs) = do
 emitFooter :: MonadCode m => m i i (Label m i)
 emitFooter = do
   getstatic "java/lang/System" "out" (L"java/io/PrintStream")
-  invokevirtual (L"java/io/PrintStream") "flush" ()V
+  invokevirtual "java/io/PrintStream" "flush" ()V
   return

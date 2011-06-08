@@ -235,7 +235,7 @@ class Indexed.Monad m => MonadCode m where
   invokevirtual :: ( ParameterDesc args
                    , ReturnDesc result
                    ) =>
-                   Reference ->
+                   String ->
                    String ->
                    args ->
                    result ->

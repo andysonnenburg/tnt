@@ -53,7 +53,7 @@ main = BL.getContents Monad.>>=
           new "Main"
           dup
           invokespecial "Main" "<init>" ()V
-          invokevirtual (L"Main") "run" ()V
+          invokevirtual "Main" "run" ()V
           return
       , execCode (fromList [public, final]) "run" ()V x
       ]
