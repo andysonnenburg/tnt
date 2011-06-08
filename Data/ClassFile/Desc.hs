@@ -113,7 +113,7 @@ $(do
     let names' = take i names
         tvs = map varT names'
         ctxt = cxt . map (\tv -> classP ''FieldType [tv]) $ tvs
-        tupleTyp = foldl' appT (tupleT i) $ tvs
+        tupleTyp = foldl' appT (tupleT i) tvs
   
     let
       p = tupP . map varP $ names'
