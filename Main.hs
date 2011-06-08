@@ -1,60 +1,39 @@
-{-# LANGUAGE RebindableSyntax #-}
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+{-# LANGUAGE DeriveDataTypeable, RecordWildCards #-}
+{-# OPTIONS_GHC -fno-cse #-}
 module Main (main) where
 
 import Control.Applicative
-import qualified Control.Monad as Monad
-import Control.Monad.Code
-import Control.Monad.Indexed hiding (return)
+import Control.Monad ((>=>), forM_)
 
-import Data.Binary.Put
 import qualified Data.ByteString.Lazy as BL
-import Data.ClassFile
-import Data.ClassFile.Access
 
-import Language.Brainfuck.Emitter
-import Language.Brainfuck.Optimizer
-import Language.Brainfuck.Parser
+import Language.Brainfuck.Compiler
 
+import System.Console.CmdArgs
+import System.FilePath
 import System.IO
 
 import Prelude hiding (Monad (..))
 
+data BF = BF { files :: [FilePath] } deriving (Show, Data, Typeable)
+
+bf :: Mode (CmdArgs BF)
+bf = cmdArgsMode BF { files = def &= args &= typ "FILES" }
+
 main :: IO ()
-main = BL.getContents Monad.>>=
-       either
-       (hPutStrLn stderr)
-       (putBinary .
-        runPut .
-        putClassFile .
-        toClassFile .
-        emit .
-        optimize) .
-       parse
+main = do
+  BF {..} <- cmdArgsRun bf
+  forM_ files $ \inputFile -> do
+    let outputFile = replaceExtension inputFile ".class"
+        className = dropExtension inputFile
+    withFile inputFile ReadMode $
+      BL.hGetContents >=>
+      either
+      (hPutStrLn stderr)
+      (withFile outputFile WriteMode . flip hPutBinary) .
+      compile className
   where
-    putBinary s = hSetBinaryMode stdout True *>
-                  BL.putStr s <*
-                  hSetBinaryMode stdout False
+    hPutBinary h s = hSetBinaryMode h True *>
+                     BL.hPutStr h s <*
+                     hSetBinaryMode h False
     
-    toClassFile x =
-      classM 50 (fromList [public, final]) "Main" (Just "java/lang/Object")
-      []
-      []
-      [ execCode
-        (fromList [public]) "<init>" ()V $ do
-          aload 0
-          invokespecial "java/lang/Object" "<init>" ()V
-          return
-      , execCode
-        (fromList [ public
-                  , static
-                  , final
-                  ]) "main" (A$L"java/lang/String")V $ do
-          new "Main"
-          dup
-          invokespecial "Main" "<init>" ()V
-          invokevirtual "Main" "run" ()V
-          return
-      , execCode (fromList [public, final]) "run" ()V x
-      ]
-      []
