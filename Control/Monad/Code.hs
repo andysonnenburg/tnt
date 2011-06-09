@@ -77,9 +77,13 @@ newtype StateT m a = StateT { runStateT :: S -> m (PairS a) }
 
 instance Monad m => Monad (StateT m) where
   return a = StateT $ \s -> return (a :+: s)
+  {-# INLINE return #-}
+  
   m >>= k = StateT $ \s -> do
     ~(a :+: s') <- runStateT m s
     runStateT (k a) s'
+  {-# INLINE (>>=) #-}
+
   fail str = StateT $ \_ -> fail str
 
 instance MonadFix m => MonadFix (StateT m) where
