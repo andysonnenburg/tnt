@@ -36,7 +36,7 @@ import Data.ClassFile.MethodInfo
 import Data.Int
 import Data.Word
 
-import Prelude hiding (Double, Float, Int, Integer, return)
+import Prelude hiding (Double, Float, Int, return)
 
 type Code s = CodeT s (ConstantPoolT Version)
 
@@ -213,8 +213,8 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
   ifeq (Label target) = CodeT $ do
     s@S {..} <- get
     let offset = target - fromIntegral codeLength
-    when (target > fromIntegral (maxBound :: Int16) ||
-          target < fromIntegral (minBound :: Int16)) $
+    when (offset > fromIntegral (maxBound :: Int16) ||
+          offset < fromIntegral (minBound :: Int16)) $
       fail "TODO: wide branch offsets"
     put s { stack = stack - 1
           , codeLength = codeLength + 3
