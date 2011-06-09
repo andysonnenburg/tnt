@@ -90,17 +90,17 @@ instance MonadFix m => MonadFix (StateT m) where
   mfix f = StateT $ \s -> s `seq` mfix $ \ ~(a :+: _) -> runStateT (f a) s
 
 lift :: Monad m => m a -> StateT m a
-lift m = StateT $ \s -> do
+lift m = StateT $ \s -> s `seq` do
   a <- m
   return (a :+: s)
 {-# INLINE lift #-}
 
 get :: Monad m => StateT m S
-get = StateT $ \s -> return (s :+: s)
+get = StateT $ \s -> s `seq` return (s :+: s)
 {-# INLINE get #-}
 
 put :: Monad m => S -> StateT m ()
-put s = StateT $ \_ -> return (() :+: s)
+put s = s `seq` StateT $ \_ -> return (() :+: s)
 {-# INLINE put #-}
 
 newtype CodeT s m i j a = CodeT
