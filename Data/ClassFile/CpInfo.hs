@@ -6,9 +6,10 @@ module Data.ClassFile.CpInfo
 
 import Data.Binary.IEEE754
 import Data.Binary.Put
+import Data.Bits
 import qualified Data.ByteString.Lazy as BL
+import Data.Char
 import Data.Int
-import Data.String.UTF8
 import Data.Word
 
 data CpInfo = Class
@@ -79,6 +80,31 @@ putCpInfo x = case x of
     putWord16be descriptorIndex
   Utf8 {..} -> do
     putWord8 1
-    let bytes' = toRep . fromString $ bytes
+    let bytes' = BL.pack . encode $ bytes
     putWord16be . fromIntegral . BL.length $ bytes'
     putLazyByteString bytes'
+
+encode :: String -> [Word8]
+encode = concatMap encodeChar
+
+encodeChar :: Char -> [Word8]
+encodeChar = map fromIntegral . go . ord
+ where
+   go x
+     | x <= 0x7f = [x]
+     
+     | x == 0x0 ||
+       x <= 0x7ff = [ 0xc0 + (x `shiftR` 6)
+                    , 0x80 + x .&. 0x3f
+                    ]
+     
+     | x <= 0xffff = [ 0xe0 + (x `shiftR` 12)
+                     , 0x80 + ((x `shiftR` 6) .&. 0x3f)
+                     , 0x80 + x .&. 0x3f
+                     ]
+                     
+     | otherwise = [ 0xf0 + (x `shiftR` 18)
+                   , 0x80 + ((x `shiftR` 12) .&. 0x3f)
+                   , 0x80 + ((x `shiftR` 6) .&. 0x3f)
+                   , 0x80 + x .&. 0x3f
+                   ]
