@@ -27,7 +27,6 @@ import qualified Control.Monad.Code.Opcode as Opcode
 import Control.Monad.ConstantPool
 import Control.Monad.Fix
 import qualified Control.Monad.Indexed as Indexed
-import Control.Monad.State
 import Control.Monad.Version
 
 import Data.Binary.Put
@@ -72,14 +71,48 @@ data S = S { stack :: {-# UNPACK #-} !Word16
            , code :: {-# UNPACK #-} !Put
            }
 
+data PairS a = a :+: S
+
+newtype StateT m a = StateT { runStateT :: S -> m (PairS a) }
+
+instance Monad m => Monad (StateT m) where
+  return a = StateT $ \s -> return (a :+: s)
+  m >>= k = StateT $ \s -> do
+    ~(a :+: s') <- runStateT m s
+    runStateT (k a) s'
+  fail str = StateT $ \_ -> fail str
+
+instance MonadFix m => MonadFix (StateT m) where
+  mfix f = StateT $ \s -> s `seq` mfix $ \ ~(a :+: _) -> runStateT (f a) s
+
+lift :: Monad m => m a -> StateT m a
+lift m = StateT $ \s -> do
+  a <- m
+  return (a :+: s)
+{-# INLINE lift #-}
+
+get :: Monad m => StateT m S
+get = StateT $ \s -> return (s :+: s)
+{-# INLINE get #-}
+
+put :: Monad m => S -> StateT m ()
+put s = StateT $ \_ -> return (() :+: s)
+{-# INLINE put #-}
+
 newtype CodeT s m i j a = CodeT
-                          { unCodeT :: StateT S m a
-                          } deriving ( Functor
-                                     , Applicative
-                                     , Alternative
-                                     , Monad
+                          { unCodeT :: StateT m a
+                          } deriving ( Monad
                                      , MonadFix
                                      )
+
+instance Monad m => Indexed.Monad (CodeT s m) where
+  return = CodeT . return
+  {-# INLINE return #-}
+  
+  m >>= k = CodeT $ unCodeT m >>= unCodeT . k
+  {-# INLINE (>>=) #-}
+  
+  fail = CodeT . fail
 
 runCodeT :: forall s parameters result m i a.
             ( ParameterDesc parameters
@@ -93,7 +126,7 @@ runCodeT :: forall s parameters result m i a.
             CodeT s m () i a ->
             m (a, MethodInfo)
 runCodeT access name args result (CodeT m) = do
-  (a, S _ ms ml _ c) <- runStateT m initState
+  a :+: S _ ms ml _ c <- runStateT m initState
   let codeAttribute = codeAttributeM ms (ml + stackSize args) (runPut c)
   method <- methodM access name args result [codeAttribute]
   return (a, method)
@@ -119,15 +152,6 @@ initState = S { stack = 0
               , codeLength = 0
               , code = return ()
               }
-
-instance Monad m => Indexed.Monad (CodeT s m) where
-  m >>= k = CodeT $ unCodeT m >>= unCodeT . k
-  {-# INLINE (>>=) #-}
-  
-  return = CodeT . return
-  {-# INLINE return #-}
-
-  fail = CodeT . fail
 
 instance MonadConstantPool m => MonadCode (CodeT s m) where
   
@@ -333,11 +357,11 @@ insn' i j n m = CodeT $ do
   S {..} <- get
   let stack' = stack + i
   put S { stack = stack'
-               , maxStack = max maxStack stack'
-               , maxLocals = max maxLocals j
-               , codeLength = codeLength + n
-               , code = code >> m
-               }
+        , maxStack = max maxStack stack'
+        , maxLocals = max maxLocals j
+        , codeLength = codeLength + n
+        , code = code >> m
+        }
   return . Label . fromIntegral $ codeLength
 {-# INLINE insn' #-}
 
