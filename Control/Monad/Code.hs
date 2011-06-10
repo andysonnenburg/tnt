@@ -161,6 +161,17 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
   
   data Label (CodeT s m) xs = Label Int32
 
+  newtype ArrayType (CodeT s m) = ArrayType { unArrayType :: Word8 }
+
+  boolean = ArrayType 4
+  char = ArrayType 5
+  float = ArrayType 6
+  double = ArrayType 7
+  byte = ArrayType 8
+  short = ArrayType 9
+  int = ArrayType 10
+  long = ArrayType 11
+
   aaload = insn (-1) Opcode.aaload
   aastore = insn (-3) Opcode.aastore
   aconst_null = insn 1 Opcode.aconst_null
@@ -337,15 +348,7 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
 
   newarray typ = insn' 0 0 2 $ do
     putWord8 Opcode.newarray
-    putWord8 $! case typ of
-      T_BOOLEAN -> 4
-      T_CHAR -> 5
-      T_FLOAT -> 6
-      T_DOUBLE -> 7
-      T_BYTE -> 8
-      T_SHORT -> 9
-      T_INT -> 10
-      T_LONG -> 11
+    putWord8 $! unArrayType typ
 
   nop = CodeT $ liftM (Label . fromIntegral . codeLength) get
 

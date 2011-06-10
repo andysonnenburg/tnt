@@ -8,7 +8,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Code.Class
        ( module Data.ClassFile.Desc
-       , ArrayType (..)
        , MonadCode (..)
        , ldc
        ) where
@@ -140,32 +139,34 @@ instance PushF Double a where
 instance PushF Reference a where
   type Push Reference a = (Reference, a)
 
-type Operation m i j = m i j (Label m i)
-
-data ArrayType = T_BOOLEAN
-               | T_CHAR
-               | T_FLOAT
-               | T_DOUBLE
-               | T_BYTE
-               | T_SHORT
-               | T_INT
-               | T_LONG
+type Operation m p q = m p q (Label m p)
 
 class Indexed.Monad m => MonadCode m where
   
   data Label m :: * -> *
   
+  data ArrayType m
+  
+  boolean :: ArrayType m
+  char :: ArrayType m
+  float :: ArrayType m
+  double :: ArrayType m
+  byte :: ArrayType m
+  short :: ArrayType m
+  int :: ArrayType m
+  long :: ArrayType m
+  
   aaload :: Operation m (Int, (Reference, xs)) (Reference, xs)
   aastore :: Operation m (Reference, (Int, (Reference, xs))) xs
   aconst_null :: Operation m xs (Reference, xs)
   aload :: Word16 -> Operation m xs (Reference, xs)
-  -- anewarray :: Reference -> t (Cons Int xs) (Cons Reference xs) (Label m)
-  -- areturn :: m (Cons Reference xs) xs (Label m)
-  -- arraylength :: m (Cons Reference xs) (Cons Int xs) (Label m)
+  anewarray :: Operation m (Int, xs) (Reference, xs)
+  areturn :: Operation m (Reference, xs) xs
+  arraylength :: Operation m (Reference, xs) (Int, xs)
   astore :: ReturnAddressOrReference objectref =>
             Word16 ->
-	    Operation m (objectref, xs) xs
-  -- athrow :: t (Cons Reference xs) xs (Label m)
+            Operation m (objectref, xs) xs
+  athrow :: Operation m (Reference, xs) xs
   
   baload :: Operation m (Int, (Reference, xs)) (Int, xs)
   bastore :: Operation m (Int, (Int, (Reference, xs))) xs
@@ -273,25 +274,25 @@ class Indexed.Monad m => MonadCode m where
   ldcDouble :: Prelude.Double -> Operation m xs (Double, xs)
   
   new :: String -> Operation m xs (Reference, xs)
-  newarray :: ArrayType -> Operation m (Int, xs) (Reference, xs)
+  newarray :: ArrayType m -> Operation m (Int, xs) (Reference, xs)
   nop :: Operation m xs xs
   
   return :: Operation m xs xs
   
-class MonadCode m => LDC a b m | a -> b where
+class MonadCode m => Ldc a b m | a -> b where
   ldc :: b -> Operation m xs (a, xs)
 
-instance MonadCode m => LDC Int Int32 m where
+instance MonadCode m => Ldc Int Int32 m where
   ldc = ldcInt
 
-instance MonadCode m => LDC Float Prelude.Float m where
+instance MonadCode m => Ldc Float Prelude.Float m where
   ldc = ldcFloat
 
-instance MonadCode m => LDC Reference String m where
+instance MonadCode m => Ldc Reference String m where
   ldc = ldcString
 
-instance MonadCode m => LDC Long Int64 m where
+instance MonadCode m => Ldc Long Int64 m where
   ldc = ldcLong
 
-instance MonadCode m => LDC Double Prelude.Double m where
+instance MonadCode m => Ldc Double Prelude.Double m where
   ldc = ldcDouble

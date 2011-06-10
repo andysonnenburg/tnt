@@ -91,10 +91,13 @@ encodeChar :: Char -> [Word8]
 encodeChar = map fromIntegral . go . ord
  where
    go x
+     | x == 0x0 = [ 0xc0
+                  , 0x80
+                  ]
+     
      | x <= 0x7f = [x]
      
-     | x == 0x0 ||
-       x <= 0x7ff = [ 0xc0 + (x `shiftR` 6)
+     | x <= 0x7ff = [ 0xc0 + (x `shiftR` 6)
                     , 0x80 + x .&. 0x3f
                     ]
      

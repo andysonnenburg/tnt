@@ -13,12 +13,10 @@ import System.Console.CmdArgs
 import System.FilePath
 import System.IO
 
-import Prelude hiding (Monad (..))
-
 data BF = BF { files :: [FilePath] } deriving (Show, Data, Typeable)
 
 bf :: Mode (CmdArgs BF)
-bf = cmdArgsMode BF { files = def &= args &= typ "FILES" }
+bf = cmdArgsMode BF { files = def &= args &= typFile }
 
 main :: IO ()
 main = do

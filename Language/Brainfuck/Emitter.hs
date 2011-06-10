@@ -1,4 +1,4 @@
-{-# LANGUAGE DoRec, NoMonomorphismRestriction, RebindableSyntax #-}
+{-# LANGUAGE NoMonomorphismRestriction, RebindableSyntax #-}
 {-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-unused-do-bind #-}
 module Language.Brainfuck.Emitter (emit) where
@@ -28,7 +28,7 @@ emit xs = do
 emitHeader :: Emit i
 emitHeader = do
   label <- ldc 30000
-  newarray T_BYTE
+  newarray byte
   astore 1
   ldc 0
   istore 2

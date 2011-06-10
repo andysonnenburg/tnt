@@ -45,7 +45,7 @@ Cabal-version:       >=1.2
 library
 
 executable bf
-  main-is: Main.hs
+  main-is: BF.hs
   build-depends: base >= 4
                , bytestring
                , array
@@ -53,10 +53,25 @@ executable bf
                , binary
                , template-haskell
                , mtl
-               , utf8-string
                , data-binary-ieee754
                , cmdargs
                , filepath
   other-modules: Language.Brainfuck.Lexer, Language.Brainfuck.Parser
+  build-tools: alex, happy
+  ghc-options: -Wall -O3 -funbox-strict-fields -rtsopts
+
+executable tnt
+  main-is: TNT.hs
+  build-depends: base >= 4
+               , bytestring
+               , array
+               , containers
+               , binary
+               , template-haskell
+               , mtl
+               , data-binary-ieee754
+               , cmdargs
+               , filepath
+  other-modules: Language.TNT.Lexer
   build-tools: alex, happy
   ghc-options: -Wall -O3 -funbox-strict-fields -rtsopts
