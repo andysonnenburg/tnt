@@ -213,7 +213,7 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
     put s { codeLength = codeLength + 3
           , code = code >> do
             putWord8 Opcode.goto
-            putWord16be $! fromIntegral offset
+            putWord16be . fromIntegral $ offset
           }
     return . Label . fromIntegral $ codeLength
 
@@ -231,7 +231,7 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
           , codeLength = codeLength + 3
           , code = code >> do
             putWord8 Opcode.ifeq
-            putWord16be $! fromIntegral offset
+            putWord16be . fromIntegral $ offset
           }
     return . Label . fromIntegral $ codeLength
   
@@ -241,15 +241,15 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
       cnst <= fromIntegral (maxBound :: Int8) =
       insn' 0 local 3 $ do
         putWord8 Opcode.iinc
-        putWord8 $! fromIntegral local
-        putWord8 $! fromIntegral cnst
+        putWord8 . fromIntegral $ local
+        putWord8 . fromIntegral $ cnst
     | cnst >= fromIntegral (minBound :: Int16) &&
       cnst <= fromIntegral (maxBound :: Int16) =
       insn' 0 local 6 $ do
         putWord8 Opcode.wide
         putWord8 Opcode.iinc
         putWord16be local
-        putWord16be $! fromIntegral cnst
+        putWord16be . fromIntegral $ cnst
     | otherwise = iload local Indexed.>>= \label ->
                   ldc cnst Indexed.>>
                   iadd Indexed.>>
@@ -275,7 +275,7 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
     unCodeT $ insn' i 0 5 $ do
       putWord8 Opcode.invokeinterface
       putWord16be x
-      putWord8 $! (+ 1) . fromIntegral . stackSize $ args
+      putWord8 . (+ 1) . fromIntegral . stackSize $ args
       putWord8 0
     where
       dsc = methodDesc args result
@@ -313,11 +313,11 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
       | x >= fromIntegral (minBound :: Int8) &&
         x <= fromIntegral (maxBound :: Int8) -> insn' 1 0 2 $ do
           putWord8 Opcode.bipush
-          putWord8 $! fromIntegral x
+          putWord8 . fromIntegral $ x
       | x >= fromIntegral (minBound :: Int16) &&
         x <= fromIntegral (maxBound :: Int16) -> insn' 1 0 3 $ do
           putWord8 Opcode.sipush
-          putWord16be $! fromIntegral x
+          putWord16be . fromIntegral $ x
       | otherwise -> ldcInsn lookupInteger x
 
   ldcFloat x = case x of
@@ -348,7 +348,7 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
 
   newarray typ = insn' 0 0 2 $ do
     putWord8 Opcode.newarray
-    putWord8 $! unArrayType typ
+    putWord8 . unArrayType $ typ
 
   nop = CodeT $ liftM (Label . fromIntegral . codeLength) get
 
@@ -370,11 +370,9 @@ insn' i j n m = CodeT $ do
         , code = code >> m
         }
   return . Label . fromIntegral $ codeLength
-{-# INLINE insn' #-}
 
 insn :: Monad m => Word16 -> Word8 -> CodeT s m i j (Label (CodeT s m) i)
 insn i opcode = insn' i 0 1 $ putWord8 opcode
-{-# INLINE insn #-}
 
 varInsn :: Monad m =>
            Word16 ->
@@ -384,7 +382,7 @@ varInsn :: Monad m =>
 varInsn i var opcode
   | var < fromIntegral (maxBound :: Word8) = insn' i (var + 1) 2 $ do
     putWord8 opcode
-    putWord8 $! fromIntegral var
+    putWord8 . fromIntegral $ var
   | otherwise = insn' i (var + 1) 3 $ do
     putWord8 Opcode.wide
     putWord8 opcode
