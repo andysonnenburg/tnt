@@ -159,7 +159,7 @@ initState = S { stack = 0
 
 instance MonadConstantPool m => MonadCode (CodeT s m) where
   
-  data Label (CodeT s m) xs = Label Int32
+  newtype Label (CodeT s m) xs = Label Int32
 
   newtype ArrayType (CodeT s m) = ArrayType { unArrayType :: Word8 }
 
