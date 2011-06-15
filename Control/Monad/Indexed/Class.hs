@@ -3,14 +3,15 @@ module Control.Monad.Indexed.Class (Monad (..)) where
 
 import Prelude hiding (Monad (..))
 
-infixl 1 >>, >>=
+infixl 1 `ithen`, `ibind`
 
 class Monad m where
-  (>>=) :: m i j a -> (a -> m j k b) -> m i k b
-  (>>) :: m i j a -> m j k b -> m i k b
-  return :: a -> m i i a
-  fail :: String -> m i j a
+  ibind :: m i j a -> (a -> m j k b) -> m i k b
+  ithen :: m i j a -> m j k b -> m i k b
+  ireturn :: a -> m i i a
+  ifail :: String -> m i j a
   
-  {-# INLINE (>>) #-}
-  m >> k = m >>= \_ -> k
-  fail = error
+  m `ithen` k = m `ibind` \_ -> k
+  {-# INLINE ithen #-}
+  
+  ifail = error

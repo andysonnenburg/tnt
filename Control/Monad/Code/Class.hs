@@ -234,6 +234,7 @@ class Indexed.Monad m => MonadCode m where
   iinc :: Word16 -> Int32 -> Operation m xs xs
   
   ifeq :: Label m xs -> Operation m (Int, xs) xs
+  ifne :: Label m xs -> Operation m (Int, xs) xs
   
   iload :: Word16 -> Operation m xs (Int, xs)
   

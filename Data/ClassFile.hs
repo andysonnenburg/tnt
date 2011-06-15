@@ -60,7 +60,7 @@ putClassFile ClassFile {..} = do
 type M = ConstantPoolT Version
 
 classM :: Word16 ->
-          AccessSet ->
+          FlagSet ClassAccess ->
           String ->
           Maybe String ->
           [String] ->
@@ -82,7 +82,7 @@ classM
       (\m -> runVersion m 0 version) . runConstantPoolT $ do
         let minorVersion = 0
         majorVersion <- lift $ getMajorVersion
-        let accessFlags = toFlags access
+        let accessFlags = fromFlags access
         thisClass <- lookupClass thisClass
         superClass <- maybe (return 0) lookupClass superClass
         interfaces <- mapM lookupClass interfaces
@@ -106,14 +106,14 @@ methodM :: ( ParameterDesc args
            , ReturnDesc result
            , MonadConstantPool m
            ) =>
-           AccessSet ->
+           FlagSet MethodAccess ->
            String ->
            args ->
            result ->
            [m AttributeInfo] ->
            m MethodInfo
 methodM access name args result attributes = do
-  let accessFlags = toFlags access
+  let accessFlags = fromFlags access
   nameIndex <- lookupUtf8 name
   descriptorIndex <- lookupUtf8 $ methodDesc args result
   attributes <- sequence attributes

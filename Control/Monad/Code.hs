@@ -1,11 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Code
        ( module Control.Monad.Code.Class
@@ -26,7 +24,8 @@ import qualified Control.Monad.Code.Class
 import qualified Control.Monad.Code.Opcode as Opcode
 import Control.Monad.ConstantPool
 import Control.Monad.Fix
-import qualified Control.Monad.Indexed as Indexed
+import Control.Monad.Indexed.Class hiding (Monad)
+import qualified Control.Monad.Indexed.Class as Indexed
 import Control.Monad.Version
 
 import Data.Binary.Put
@@ -44,7 +43,7 @@ runCode :: forall s parameters result i a.
            ( ParameterDesc parameters
            , ReturnDesc result
            ) =>
-           AccessSet ->
+           FlagSet MethodAccess ->
            String ->
            parameters ->
            result ->
@@ -56,7 +55,7 @@ execCode :: forall s parameters result i a.
             ( ParameterDesc parameters
             , ReturnDesc result
             ) =>
-            AccessSet ->
+            FlagSet MethodAccess ->
             String ->
             parameters ->
             result ->
@@ -67,7 +66,7 @@ execCode = execCodeT
 data S = S { stack :: {-# UNPACK #-} !Word16
            , maxStack :: {-# UNPACK #-} !Word16
            , maxLocals :: {-# UNPACK #-} !Word16
-           , codeLength :: {-# UNPACK #-} !Word16
+           , codeLength :: {-# UNPACK #-} !Int32
            , code :: {-# UNPACK #-} !Put
            }
 
@@ -76,7 +75,7 @@ data PairS a = a :+: S
 newtype StateT m a = StateT { runStateT :: S -> m (PairS a) }
 
 instance Monad m => Monad (StateT m) where
-  return a = StateT $ \s -> return (a :+: s)
+  return a = StateT $ \s -> s `seq` return (a :+: s)
   {-# INLINE return #-}
   
   m >>= k = StateT $ \s -> do
@@ -110,20 +109,20 @@ newtype CodeT s m i j a = CodeT
                                      )
 
 instance Monad m => Indexed.Monad (CodeT s m) where
-  return = CodeT . return
-  {-# INLINE return #-}
+  ireturn = CodeT . return
+  {-# INLINE ireturn #-}
   
-  m >>= k = CodeT $ unCodeT m >>= unCodeT . k
-  {-# INLINE (>>=) #-}
+  m `ibind` k = CodeT $ unCodeT m >>= unCodeT . k
+  {-# INLINE ibind #-}
   
-  fail = CodeT . fail
+  ifail = CodeT . fail
 
 runCodeT :: forall s parameters result m i a.
             ( ParameterDesc parameters
             , ReturnDesc result
             , MonadConstantPool m
             ) =>
-            AccessSet ->
+            FlagSet MethodAccess ->
             String ->
             parameters ->
             result ->
@@ -140,7 +139,7 @@ execCodeT :: forall s parameters result m i a.
              , ReturnDesc result
              , MonadConstantPool m
              ) =>
-             AccessSet ->
+             FlagSet MethodAccess ->
              String ->
              parameters ->
              result ->
@@ -157,7 +156,7 @@ initState = S { stack = 0
               , code = return ()
               }
 
-instance MonadConstantPool m => MonadCode (CodeT s m) where
+instance (MonadFix m, MonadConstantPool m) => MonadCode (CodeT s m) where
   
   newtype Label (CodeT s m) xs = Label Int32
 
@@ -206,7 +205,7 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
 
   goto (Label target) = CodeT $ do
     s@S {..} <- get
-    let offset = target - fromIntegral codeLength
+    let offset = target - codeLength
     when (offset > fromIntegral (maxBound :: Int16) ||
           offset < fromIntegral (minBound :: Int16)) $
       fail "TODO: wide branch offsets"
@@ -215,7 +214,7 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
             putWord8 Opcode.goto
             putWord16be . fromIntegral $ offset
           }
-    return . Label . fromIntegral $ codeLength
+    return . Label $ codeLength
 
   i2b = insn 0 Opcode.i2b
   
@@ -223,17 +222,31 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
 
   ifeq (Label target) = CodeT $ do
     s@S {..} <- get
-    let offset = target - fromIntegral codeLength
+    let offset = target - codeLength
     when (offset > fromIntegral (maxBound :: Int16) ||
           offset < fromIntegral (minBound :: Int16)) $
-      fail "TODO: wide branch offsets"
+      fail "TODO: wide branch offsets"                                          
     put s { stack = stack - 1
           , codeLength = codeLength + 3
           , code = code >> do
             putWord8 Opcode.ifeq
             putWord16be . fromIntegral $ offset
           }
-    return . Label . fromIntegral $ codeLength
+    return . Label $ codeLength
+  
+  ifne (Label target) = CodeT $ do
+    s@S {..} <- get
+    let offset = target - codeLength
+    when (offset > fromIntegral (maxBound :: Int16) ||
+          offset < fromIntegral (minBound :: Int16)) $
+      fail "TODO: wide branch offsets"
+    put s { stack = stack - 1
+          , codeLength = codeLength + 3
+          , code = code >> do
+            putWord8 Opcode.ifne
+            putWord16be . fromIntegral $ offset
+          }
+    return . Label $ codeLength
   
   iinc local cnst
     | local <= fromIntegral (maxBound :: Word8) &&
@@ -250,11 +263,11 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
         putWord8 Opcode.iinc
         putWord16be local
         putWord16be . fromIntegral $ cnst
-    | otherwise = iload local Indexed.>>= \label ->
-                  ldc cnst Indexed.>>
-                  iadd Indexed.>>
-                  istore local Indexed.>>
-                  Indexed.return label
+    | otherwise = iload local `ibind` \label ->
+                  ldc cnst `ithen`
+                  iadd `ithen`
+                  istore local `ithen`
+                  ireturn label
 
   iload j = case j of
     0 -> insn' 1 1 1 $ putWord8 Opcode.iload_0
@@ -350,14 +363,14 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
     putWord8 Opcode.newarray
     putWord8 . unArrayType $ typ
 
-  nop = CodeT $ liftM (Label . fromIntegral . codeLength) get
+  nop = CodeT $ liftM (Label . codeLength) get
 
   return = insn 0 Opcode.return
 
 insn' :: Monad m =>
          Word16 ->
          Word16 ->
-         Word16 ->
+         Int32 ->
          Put ->
          CodeT s m i j (Label (CodeT s m) i)
 insn' i j n m = CodeT $ do
@@ -369,7 +382,7 @@ insn' i j n m = CodeT $ do
         , codeLength = codeLength + n
         , code = code >> m
         }
-  return . Label . fromIntegral $ codeLength
+  return . Label $ codeLength
 
 insn :: Monad m => Word16 -> Word8 -> CodeT s m i j (Label (CodeT s m) i)
 insn i opcode = insn' i 0 1 $ putWord8 opcode

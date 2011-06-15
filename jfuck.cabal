@@ -72,6 +72,7 @@ executable tnt
                , data-binary-ieee754
                , cmdargs
                , filepath
-  other-modules: Language.TNT.Lexer
+               , utf8-string
+  other-modules: Language.TNT.Lexer, Language.TNT.Parser
   build-tools: alex, happy
   ghc-options: -Wall -O3 -funbox-strict-fields -rtsopts
