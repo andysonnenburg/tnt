@@ -6,22 +6,25 @@ import Data.Maybe
 import Language.TNT.Expression
 import qualified Language.TNT.Expression as Expression
 import Language.TNT.Lexer
+import Language.TNT.Statement
+import qualified Language.TNT.Statement as Statement
 import Language.TNT.Token
 import qualified Language.TNT.Token as Token
 }
 
 %tokentype { Token }
 
-%token IMPORT { Token Token.Import _ }
-%token STRING { Token (Token.String $$) _ }
-%token NAME { Token (Name $$) _ }
-%token '=' { Token Equals _ }
-%token DOT { Token Dot _ }
-%token OPEN_PAREN { Token OpenParen _ }
-%token CLOSE_PAREN { Token CloseParen _ }
-%token SEMI { Token Semi _ }
-%token NEWLINE { Token Newline _ }
-
+%token
+  IMPORT { Token Token.Import _ }
+  STRING { Token (Token.String $$) _ }
+  NAME { Token (Name $$) _ }
+  '=' { Token Equals _ }
+  '.' { Token Dot _ }
+  ',' { Token Comma _ }
+  '(' { Token OpenParen _ }
+  ')' { Token CloseParen _ }
+  ';' { Token Semi _ }
+  '\n' { Token Newline _ }
 
 %name parser
 
@@ -33,46 +36,53 @@ import qualified Language.TNT.Token as Token
 
 %%
 
-many_expressions : many_reversed_expressions { catMaybes . reverse $ $1 }
+many_statements : many_reversed_statements { reverse $ $1 }
+
+many_reversed_statements : statement { [$1] }
+                         | many_reversed_statements terminator statement {
+                             $3 : $1
+                           }
+
+many_expressions : many_reversed_expressions { reverse $1 }
 
 many_reversed_expressions : { [] }
-                          | many_reversed_expressions expression { $2 : $1 }
+                          | many_reversed_expressions ',' expression {
+                              $3 : $1
+                            }
 
-expression : terminator { Nothing }
-           | import { Just $1 }
-           | string { Just $1 }
-           | variable { Just $1 }
-           | access { Just $1 }
-           | invoke { Just $1 }
+statement : { Empty }
+          | import { Statement.Import $1 }
+          | expression { Expression $1 }
 
-import : IMPORT optional_newline qualified_name terminator {
-    Expression.Import $3
-  }
+expression : string { $1 }
+           | variable { $1 }
+           | access { $1 }
+           | mutate { $1 }
+           | invoke { $1 }
+
+terminator : ';' {}
+           | '\n' {}
+
+import : IMPORT qualified_name { $2 }
 
 string : STRING { Expression.String $1 }
 
 variable : NAME { Variable $1 }
 
-access : expression DOT NAME { Access $1 $3 }
+access : expression '.' NAME { Access $1 $3 }
 
-mutate : expression '=' expression { Mutate $1 $3 }
+mutate : expression '.' NAME '=' expression { Mutate $1 $3 $5 }
 
-invoke : expression OPEN_PAREN many_expressions CLOSE_PAREN {
+invoke : expression '(' many_expressions ')' {
     Invoke $1 $3
   }
 
 qualified_name : NAME { $1 }
 
-optional_newline : { () }
-                 | NEWLINE { () }
-
-terminator : NEWLINE { () }
-           | SEMI { () }
-
 {
 parse = flip runAlex parser
   
-parseError (Token x p) = alexError . show $ p
+parseError x@(Token _ _) = alexError . show $ x
   
 lexer = (alexMonadScan >>=)
 }

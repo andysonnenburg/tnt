@@ -30,14 +30,16 @@ $alpha = [a-zA-Z]
   <0> \n { newline }
   <0> $white ;
   <0> "//".* ;
-  <0> "import" / [^ $alpha $digit \_] { import' }
+  <0> "import" { import' }
   <0> @name { name }
   <0> \" { beginString `andBegin` string }
   <string> "\\" { begin escapedChar }
   <escapedChar> \" { char `andBegin` string }
   <string> \" { endString `andBegin` 0}
   <string> . { char }
+  <0> "=" { equals }
   <0> "." { dot }
+  <0> "," { comma }
   <0> "(" { openParen }
   <0> ")" { closeParen }
   <0> ";" { semi }
@@ -69,7 +71,9 @@ endString (p, _, _) _ = f <$> alexGetUserState
     f = flip Token (fromAlexPosn p) . String . decode . ($ [])
 
 import' = token' Import
+equals = token' Equals
 dot = token' Dot
+comma = token' Comma
 openParen = token' OpenParen
 closeParen = token' CloseParen
 semi = token' Semi

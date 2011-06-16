@@ -2,11 +2,9 @@ module Language.TNT.Expression
        ( Expression (..)
        ) where
 
-data Expression = Empty
-                | Import String
-                | Variable String
+data Expression = Variable String
                 | String String
                 | Declare String Expression
                 | Access Expression String
-                | Mutate Expression Expression
+                | Mutate Expression String Expression
                 | Invoke Expression [Expression] deriving Show

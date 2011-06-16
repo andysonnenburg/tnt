@@ -14,6 +14,7 @@ data Value = Name String
            | Import
            | Equals
            | Dot
+           | Comma
            | OpenParen
            | CloseParen
            | Semi
