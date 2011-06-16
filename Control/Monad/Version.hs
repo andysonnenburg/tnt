@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, NamedFieldPuns #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, RecordWildCards #-}
 module Control.Monad.Version
        ( module Control.Monad.Version.Class
        , Version
@@ -18,9 +18,9 @@ import Data.Word
 
 type Version = VersionT Identity
 
-runVersion :: Version a -> Word16 -> Word16 -> a
-runVersion m minorVersion majorVersion =
-  runIdentity $ runVersionT m minorVersion majorVersion
+runVersion :: Word16 -> Word16 -> Version a -> a
+runVersion minorVersion majorVersion m =
+  runIdentity $ runVersionT minorVersion majorVersion m
 
 newtype VersionT m a = VersionT
                        { unVersionT :: ReaderT R m a
@@ -37,9 +37,9 @@ data R = R { minorVersion :: {-# UNPACK #-} !Word16
            , majorVersion :: {-# UNPACK #-} !Word16
            }
 
-runVersionT :: VersionT m a -> Word16 -> Word16 -> m a
-runVersionT m minorVersion majorVersion =
-  runReaderT (unVersionT m) R { minorVersion,  majorVersion }
+runVersionT :: Word16 -> Word16 -> VersionT m a -> m a
+runVersionT minorVersion majorVersion m =
+  runReaderT (unVersionT m) R {..}
 
 instance Monad m => MonadVersion (VersionT m) where
   getMinorVersion = VersionT $ liftM minorVersion ask

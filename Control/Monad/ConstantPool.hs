@@ -2,14 +2,17 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Control.Monad.ConstantPool
        ( module Control.Monad.ConstantPool.Class
        , ConstantPool
        , runConstantPool
+       , evalConstantPool
        , ConstantPoolT
        , runConstantPoolT
+       , evalConstantPoolT
        ) where
 
 import Control.Applicative
@@ -34,6 +37,9 @@ type ConstantPool = ConstantPoolT Identity
 
 runConstantPool :: ConstantPool a -> (a, Word16, [CpInfo])
 runConstantPool = runIdentity . runConstantPoolT
+
+evalConstantPool :: ConstantPool a -> a
+evalConstantPool = runIdentity . evalConstantPoolT
 
 data S = S {-# UNPACK #-} !Word16 ![CpInfo] !(Map CpInfo Word16)
 
@@ -63,10 +69,26 @@ runConstantPoolT m = do
   (a, S n xs _) <- runStateT (unConstantPoolT m) initState
   return (a, n, reverse xs)
 
+evalConstantPoolT :: Monad m => ConstantPoolT m a -> m a
+evalConstantPoolT m = do
+  (a, _, _) <- runConstantPoolT m
+  return a
+
 initState :: S
 initState = S 1 [] Map.empty
 
 instance Monad m => MonadConstantPool (ConstantPoolT m) where
+  
+  type ConstantPoolTable (ConstantPoolT m) = [CpInfo]
+  
+  getConstantPoolCount = ConstantPoolT $ do
+    S constantPoolCount _ _ <- get
+    return constantPoolCount
+  
+  getConstantPoolTable = ConstantPoolT $ do
+    S _ constantPoolTable _ <- get
+    return constantPoolTable
+  
   lookupClass = lookupUtf8 >=> lookup . Class
   
   lookupField typ name dsc = do

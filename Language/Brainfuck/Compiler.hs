@@ -4,7 +4,9 @@ module Language.Brainfuck.Compiler (compile) where
 
 import Control.Monad hiding (Monad (..))
 import Control.Monad.Code
+import Control.Monad.ConstantPool
 import Control.Monad.Indexed hiding (return)
+import Control.Monad.Version
 
 import Data.Binary.Put
 import Data.ByteString.Lazy (ByteString)
@@ -28,10 +30,10 @@ compile className = liftM f . parse
         optimize
 
 toClassFile :: String -> Code s () i a -> ClassFile
-toClassFile className x =
-  classM 49 (mconcat [ public
-                     , final
-                     , super]) className (Just "java/lang/Object")
+toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
+  classM (mconcat [ public
+                  , final
+                  , super]) className (Just "java/lang/Object")
     ["java/lang/Runnable"]
     []
     [ execCode

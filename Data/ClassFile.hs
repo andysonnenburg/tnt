@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DoRec, RecordWildCards, TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module Data.ClassFile
        ( ClassFile (..)
@@ -10,7 +10,6 @@ module Data.ClassFile
 
 import Control.Monad
 import Control.Monad.ConstantPool
-import Control.Monad.Trans
 import Control.Monad.Version
 
 import Data.Binary
@@ -27,7 +26,7 @@ import Data.ClassFile.MethodInfo
 data ClassFile = ClassFile
                  { minorVersion :: Word16
                  , majorVersion :: Word16
-                 , constantPoolLength :: Word16
+                 , constantPoolCount :: Word16
                  , constantPool :: [CpInfo]
                  , accessFlags :: ClassAccess
                  , thisClass :: Word16
@@ -43,7 +42,7 @@ putClassFile ClassFile {..} = do
   putWord32be 0xCAFEBABE
   putWord16be minorVersion
   putWord16be majorVersion
-  putWord16be constantPoolLength
+  putWord16be constantPoolCount
   forM_ constantPool putCpInfo
   put accessFlags
   putWord16be thisClass
@@ -57,38 +56,38 @@ putClassFile ClassFile {..} = do
   putWord16be . fromIntegral . length $ attributes
   forM_ attributes putAttributeInfo
 
-type M = ConstantPoolT Version
-
-classM :: Word16 ->
+classM :: ( MonadVersion m
+          , MonadConstantPool m
+          , ConstantPoolTable m ~ [CpInfo]
+          ) =>
           ClassAccess ->
           String ->
           Maybe String ->
           [String] ->
-          [M FieldInfo] ->
-          [M MethodInfo] ->
-          [M AttributeInfo] ->
-          ClassFile
+          [m FieldInfo] ->
+          [m MethodInfo] ->
+          [m AttributeInfo] ->
+          m ClassFile
 classM
-  version
   accessFlags
   thisClass
   superClass
   interfaces
   fields
   methods
-  attributes = a
-  where
-    (a, constantPoolLength, constantPool) =
-      (\m -> runVersion m 0 version) . runConstantPoolT $ do
-        let minorVersion = 0
-        majorVersion <- lift getMajorVersion
-        thisClass <- lookupClass thisClass
-        superClass <- maybe (return 0) lookupClass superClass
-        interfaces <- mapM lookupClass interfaces
-        fields <- sequence fields
-        methods <- sequence methods
-        attributes <- sequence attributes
-        return ClassFile {..}
+  attributes = do
+    minorVersion <- getMinorVersion
+    majorVersion <- getMajorVersion
+    thisClass <- lookupClass thisClass
+    superClass <- maybe (return 0) lookupClass superClass
+    interfaces <- mapM lookupClass interfaces
+    fields <- sequence fields
+    methods <- sequence methods
+    attributes <- sequence attributes
+    constantPoolCount <- getConstantPoolCount
+    constantPool <- getConstantPoolTable
+    return ClassFile {..}
+        
 
 methodM :: ( ParameterDesc args
            , ReturnDesc result
