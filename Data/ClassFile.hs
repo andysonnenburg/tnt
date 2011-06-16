@@ -58,7 +58,7 @@ putClassFile ClassFile {..} = do
 
 classM :: ( MonadVersion m
           , MonadConstantPool m
-          , ConstantPoolTable m ~ [CpInfo]
+          , Table m ~ [CpInfo]
           ) =>
           ClassAccess ->
           String ->
@@ -84,8 +84,8 @@ classM
     fields <- sequence fields
     methods <- sequence methods
     attributes <- sequence attributes
-    constantPoolCount <- getConstantPoolCount
-    constantPool <- getConstantPoolTable
+    constantPoolCount <- getCount
+    constantPool <- getTable
     return ClassFile {..}
         
 

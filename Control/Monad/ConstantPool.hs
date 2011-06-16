@@ -78,15 +78,15 @@ initState = S 1 [] Map.empty
 
 instance Monad m => MonadConstantPool (ConstantPoolT m) where
   
-  type ConstantPoolTable (ConstantPoolT m) = [CpInfo]
+  type Table (ConstantPoolT m) = [CpInfo]
   
-  getConstantPoolCount = ConstantPoolT $ do
-    S constantPoolCount _ _ <- get
-    return constantPoolCount
+  getCount = ConstantPoolT $ do
+    S count _ _ <- get
+    return count
   
-  getConstantPoolTable = ConstantPoolT $ do
-    S _ constantPoolTable _ <- get
-    return constantPoolTable
+  getTable = ConstantPoolT $ do
+    S _ table _ <- get
+    return table
   
   lookupClass = lookupUtf8 >=> lookup . Class
   
