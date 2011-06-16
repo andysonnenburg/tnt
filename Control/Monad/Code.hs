@@ -43,7 +43,7 @@ runCode :: forall s parameters result i a.
            ( ParameterDesc parameters
            , ReturnDesc result
            ) =>
-           FlagSet MethodAccess ->
+           MethodAccess ->
            String ->
            parameters ->
            result ->
@@ -55,7 +55,7 @@ execCode :: forall s parameters result i a.
             ( ParameterDesc parameters
             , ReturnDesc result
             ) =>
-            FlagSet MethodAccess ->
+            MethodAccess ->
             String ->
             parameters ->
             result ->
@@ -122,7 +122,7 @@ runCodeT :: forall s parameters result m i a.
             , ReturnDesc result
             , MonadConstantPool m
             ) =>
-            FlagSet MethodAccess ->
+            MethodAccess ->
             String ->
             parameters ->
             result ->
@@ -139,7 +139,7 @@ execCodeT :: forall s parameters result m i a.
              , ReturnDesc result
              , MonadConstantPool m
              ) =>
-             FlagSet MethodAccess ->
+             MethodAccess ->
              String ->
              parameters ->
              result ->

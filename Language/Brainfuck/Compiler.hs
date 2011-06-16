@@ -10,6 +10,7 @@ import Data.Binary.Put
 import Data.ByteString.Lazy (ByteString)
 import Data.ClassFile
 import Data.ClassFile.Access
+import Data.Monoid
 
 import Language.Brainfuck.Emitter
 import Language.Brainfuck.Optimizer
@@ -28,26 +29,26 @@ compile className = liftM f . parse
 
 toClassFile :: String -> Code s () i a -> ClassFile
 toClassFile className x =
-  classM 49 (fromList [ public
-                      , final
-                      , super]) className (Just "java/lang/Object")
+  classM 49 (mconcat [ public
+                     , final
+                     , super]) className (Just "java/lang/Object")
     ["java/lang/Runnable"]
     []
     [ execCode
-      (fromList [public]) "<init>" ()V $ do
+      public "<init>" ()V $ do
         aload 0
         invokespecial "java/lang/Object" "<init>" ()V
         return
     , execCode
-      (fromList [ public
-                , static
-                , final
-                ]) "main" (A$L"java/lang/String")V $ do
+      (mconcat [ public
+               , static
+               , final
+               ]) "main" (A$L"java/lang/String")V $ do
         new className
         dup
         invokespecial className "<init>" ()V
         invokevirtual className "run" ()V
         return
-    , execCode (fromList [public, final]) "run" ()V x
+    , execCode (mconcat [public, final]) "run" ()V x
     ]
     []

@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, RecordWildCards #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module Data.ClassFile
        ( ClassFile (..)
@@ -13,6 +13,7 @@ import Control.Monad.ConstantPool
 import Control.Monad.Trans
 import Control.Monad.Version
 
+import Data.Binary
 import Data.Binary.Put
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL
@@ -22,14 +23,13 @@ import Data.ClassFile.CpInfo
 import Data.ClassFile.Desc
 import Data.ClassFile.FieldInfo
 import Data.ClassFile.MethodInfo
-import Data.Word
 
 data ClassFile = ClassFile
                  { minorVersion :: Word16
                  , majorVersion :: Word16
                  , constantPoolLength :: Word16
                  , constantPool :: [CpInfo]
-                 , accessFlags :: Word16
+                 , accessFlags :: ClassAccess
                  , thisClass :: Word16
                  , superClass :: Word16
                  , interfaces :: [Word16]
@@ -45,7 +45,7 @@ putClassFile ClassFile {..} = do
   putWord16be majorVersion
   putWord16be constantPoolLength
   forM_ constantPool putCpInfo
-  putWord16be accessFlags
+  put accessFlags
   putWord16be thisClass
   putWord16be superClass
   putWord16be . fromIntegral . length $ interfaces
@@ -60,7 +60,7 @@ putClassFile ClassFile {..} = do
 type M = ConstantPoolT Version
 
 classM :: Word16 ->
-          FlagSet ClassAccess ->
+          ClassAccess ->
           String ->
           Maybe String ->
           [String] ->
@@ -70,7 +70,7 @@ classM :: Word16 ->
           ClassFile
 classM
   version
-  access
+  accessFlags
   thisClass
   superClass
   interfaces
@@ -81,49 +81,30 @@ classM
     (a, constantPoolLength, constantPool) =
       (\m -> runVersion m 0 version) . runConstantPoolT $ do
         let minorVersion = 0
-        majorVersion <- lift $ getMajorVersion
-        let accessFlags = fromFlags access
+        majorVersion <- lift getMajorVersion
         thisClass <- lookupClass thisClass
         superClass <- maybe (return 0) lookupClass superClass
         interfaces <- mapM lookupClass interfaces
         fields <- sequence fields
         methods <- sequence methods
         attributes <- sequence attributes
-        return ClassFile { minorVersion
-                         , majorVersion
-                         , accessFlags
-                         , constantPoolLength
-                         , constantPool
-                         , thisClass
-                         , superClass
-                         , interfaces
-                         , fields
-                         , methods
-                         , attributes
-                         }
+        return ClassFile {..}
 
 methodM :: ( ParameterDesc args
            , ReturnDesc result
            , MonadConstantPool m
            ) =>
-           FlagSet MethodAccess ->
+           MethodAccess ->
            String ->
            args ->
            result ->
            [m AttributeInfo] ->
            m MethodInfo
-methodM access name args result attributes = do
-  let accessFlags = fromFlags access
+methodM accessFlags name args result attributes = do
   nameIndex <- lookupUtf8 name
   descriptorIndex <- lookupUtf8 $ methodDesc args result
   attributes <- sequence attributes
-  return MethodInfo { accessFlags
-                    , nameIndex
-                    , descriptorIndex
-                    , attributes
-                    }
-  
-           
+  return MethodInfo {..}           
 
 codeAttributeM :: MonadConstantPool m =>
                   Word16 ->
@@ -139,4 +120,4 @@ codeAttributeM ms ml c = do
         putLazyByteString c
         putWord16be 0
         putWord16be 0
-  return AttributeInfo { attributeNameIndex, info }
+  return AttributeInfo {..}

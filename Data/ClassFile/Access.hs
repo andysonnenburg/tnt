@@ -1,9 +1,8 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Data.ClassFile.Access
        ( ClassAccess
        , FieldAccess
        , MethodAccess
-       , FlagSet
-       , fromList
        , public
        , private
        , protected
@@ -22,14 +21,17 @@ module Data.ClassFile.Access
        , synthetic
        , annotation
        , enum
-       , fromFlags
        ) where
 
-import Data.Bits
-import Data.List
-import Data.Word
+import Control.Applicative
 
-import Prelude hiding (Enum)
+import Data.Binary
+import Data.Binary.Get
+import Data.Binary.Put
+import Data.Bits
+import Data.Function
+import Data.List
+import Data.Monoid
 
 class Public a where
   public :: a
@@ -85,27 +87,38 @@ class Annotation a where
 class Enum a where
   enum :: a
 
-class Flag a where
-  toFlag :: Word16 -> a
-  fromFlag :: a -> Word16
-
 newtype ClassAccess = ClassAccess { unClassAccess :: Word16 }
 
-instance Flag ClassAccess where
-  toFlag = ClassAccess
-  fromFlag = unClassAccess
+instance Monoid ClassAccess where
+  mempty = ClassAccess 0
+  mappend = (ClassAccess .) . (.|.) `on` unClassAccess
+  mconcat = ClassAccess . foldl' ((. unClassAccess) . (.|.)) 0
+
+instance Binary ClassAccess where
+  get = ClassAccess <$> getWord16be
+  put = putWord16be . unClassAccess
 
 newtype FieldAccess = FieldAccess { unFieldAccess :: Word16 }
 
-instance Flag FieldAccess where
-  toFlag = FieldAccess
-  fromFlag = unFieldAccess
+instance Monoid FieldAccess where
+  mempty = FieldAccess 0
+  mappend = (FieldAccess .) . (.|.) `on` unFieldAccess
+  mconcat = FieldAccess . foldl' ((. unFieldAccess) . (.|.)) 0
+
+instance Binary FieldAccess where
+  get = FieldAccess <$> getWord16be
+  put = putWord16be . unFieldAccess
 
 newtype MethodAccess = MethodAccess { unMethodAccess :: Word16 }
 
-instance Flag MethodAccess where
-  toFlag = MethodAccess
-  fromFlag = unMethodAccess
+instance Monoid MethodAccess where
+  mempty = MethodAccess 0
+  mappend = (MethodAccess .) . (.|.) `on` unMethodAccess
+  mconcat = MethodAccess . foldl' ((. unMethodAccess) . (.|.)) 0 
+
+instance Binary MethodAccess where
+  get = MethodAccess <$> getWord16be
+  put = putWord16be . unMethodAccess
 
 instance Public ClassAccess where
   public = ClassAccess 0x0001
@@ -178,11 +191,3 @@ instance Abstract MethodAccess where
 
 instance Strict MethodAccess where
   strict = MethodAccess 0x0800
-
-newtype FlagSet a = FlagSet { unFlagSet :: Word16 }
-
-fromFlags :: FlagSet a -> Word16
-fromFlags = unFlagSet
-
-fromList :: Flag a => [a] -> FlagSet a
-fromList = FlagSet . foldl' ((. fromFlag) . (.|.)) 0

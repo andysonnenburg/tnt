@@ -6,12 +6,13 @@ module Data.ClassFile.MethodInfo
 
 import Control.Monad
 
+import Data.Binary
 import Data.Binary.Put
+import Data.ClassFile.Access
 import Data.ClassFile.AttributeInfo
-import Data.Word
 
 data MethodInfo = MethodInfo
-                  { accessFlags :: Word16
+                  { accessFlags :: MethodAccess
                   , nameIndex :: Word16
                   , descriptorIndex :: Word16
                   , attributes :: [AttributeInfo]
@@ -19,7 +20,7 @@ data MethodInfo = MethodInfo
 
 putMethodInfo :: MethodInfo -> Put
 putMethodInfo MethodInfo {..} = do
-  putWord16be accessFlags
+  put accessFlags
   putWord16be nameIndex
   putWord16be descriptorIndex
   putWord16be . fromIntegral . length $ attributes
