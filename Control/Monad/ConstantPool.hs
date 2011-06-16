@@ -64,9 +64,11 @@ instance MonadVersion m => MonadVersion (ConstantPoolT m) where
   getMajorVersion = ConstantPoolT . lift $ getMajorVersion
 
 runConstantPoolT :: Monad m => ConstantPoolT m a -> m (a, Word16, [CpInfo])
-runConstantPoolT m = do
-  (a, S n xs _) <- runStateT (unConstantPoolT m) initState
-  return (a, n, reverse xs)
+runConstantPoolT m = flip evalStateT initState . unConstantPoolT $ do
+  a <- m
+  count <- getCount
+  table <- getTable
+  return (a, count, table)
 
 evalConstantPoolT :: Monad m => ConstantPoolT m a -> m a
 evalConstantPoolT m = do
@@ -86,7 +88,7 @@ instance Monad m => MonadConstantPool (ConstantPoolT m) where
   
   getTable = ConstantPoolT $ do
     S _ table _ <- get
-    return table
+    return . reverse $ table
   
   lookupClass = lookupUtf8 >=> lookup . Class
   
