@@ -44,6 +44,19 @@ Cabal-version:       >=1.2
 
 library
 
+executable hello
+  main-is: Hello.hs
+  build-depends: base >= 4
+               , bytestring
+               , array
+               , containers
+               , binary
+               , template-haskell
+               , transformers
+               , monads-fd
+               , data-binary-ieee754
+  ghc-options: -Wall -O3
+
 executable bf
   main-is: BF.hs
   build-depends: base >= 4

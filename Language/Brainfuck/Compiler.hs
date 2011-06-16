@@ -29,7 +29,7 @@ compile className = liftM f . parse
         emit .
         optimize
 
-toClassFile :: String -> Code s () i a -> ClassFile
+toClassFile :: String -> Code s () () a -> ClassFile
 toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
   classM (mconcat [ public
                   , final

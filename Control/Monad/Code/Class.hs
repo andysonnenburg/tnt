@@ -280,7 +280,7 @@ class Indexed.Monad m => MonadCode m where
   
   return :: Operation m xs xs
   
-class MonadCode m => Ldc a b m | a -> b where
+class MonadCode m => Ldc a b m | a -> b, b -> a where
   ldc :: b -> Operation m xs (a, xs)
 
 instance MonadCode m => Ldc Int Int32 m where
