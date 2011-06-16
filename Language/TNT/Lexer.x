@@ -33,7 +33,7 @@ $alpha = [a-zA-Z]
   <0> "import" { import' }
   <0> @name { name }
   <0> \" { beginString `andBegin` string }
-  <string> "\\" { begin escapedChar }
+  <string> \\ { begin escapedChar }
   <escapedChar> \" { char `andBegin` string }
   <string> \" { endString `andBegin` 0}
   <string> . { char }
