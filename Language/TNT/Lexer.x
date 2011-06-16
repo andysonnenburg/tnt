@@ -10,8 +10,6 @@ module Language.TNT.Lexer where
 
 import Codec.Binary.UTF8.String (decode)
 
-import Control.Applicative
-
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL
 import Data.Word
@@ -48,7 +46,7 @@ $alpha = [a-zA-Z]
 
 deriving instance Functor Alex
   
-type AlexUserState = [Word8] -> [Word8]
+type AlexUserState = ([Word8] -> [Word8], Position)
 
 name :: AlexAction (Alex Token)
 name (p, _, s) x = return a 
@@ -56,19 +54,22 @@ name (p, _, s) x = return a
     a = Token (Name . toString $ BL.take (fromIntegral x) s) (fromAlexPosn p)
 
 beginString :: AlexAction (Alex Token)
-beginString _ _ = alexSetUserState id >> alexMonadScan
+beginString (p, _, _) _ = alexSetUserState (id, fromAlexPosn p) >>
+                          alexMonadScan
 
 char :: AlexAction (Alex Token)
-char (_, _, s) x = alexGetUserState >>=
-                   alexSetUserState . f >>
-                   alexMonadScan
+char (_, _, s) n = do
+  (f, p) <- alexGetUserState
+  alexSetUserState (f . g, p)
+  alexMonadScan
   where
-    f = (. (BL.unpack (BL.take (fromIntegral x) s) ++))
+    g xs = BL.unpack (BL.take (fromIntegral n) s) ++ xs
 
 endString :: AlexAction (Alex Token)
-endString (p, _, _) _ = f <$> alexGetUserState
-  where
-    f = flip Token (fromAlexPosn p) . String . decode . ($ [])
+endString (_, _, _) _ = do
+  (f, p) <- alexGetUserState
+  let x = String . decode . f $ []
+  return $ Token x p
 
 import' = token' Import
 equals = token' Equals
@@ -85,7 +86,7 @@ alexEOF :: Alex Token
 alexEOF = return EOF
 
 alexInitUserState :: AlexUserState
-alexInitUserState = id
+alexInitUserState = (id, 0 :+: 0)
 
 alexGetUserState :: Alex AlexUserState
 alexGetUserState = Alex $ \s@AlexState { alex_ust = ust} -> Right (s, ust)

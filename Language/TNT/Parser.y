@@ -46,6 +46,7 @@ many_reversed_statements : statement { [$1] }
 many_expressions : many_reversed_expressions { reverse $1 }
 
 many_reversed_expressions : { [] }
+                          | expression { [$1] }
                           | many_reversed_expressions ',' expression {
                               $3 : $1
                             }
