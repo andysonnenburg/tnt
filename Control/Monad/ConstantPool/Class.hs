@@ -10,7 +10,6 @@ class Monad m => MonadConstantPool m where
   
   getConstantPoolCount :: m Word16
   getConstantPoolTable :: m (ConstantPoolTable m)
-  
   lookupClass :: String -> m Word16
   lookupField :: String -> String -> String -> m Word16
   lookupMethod :: String -> String -> String -> m Word16

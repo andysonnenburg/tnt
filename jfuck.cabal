@@ -52,7 +52,8 @@ executable bf
                , containers
                , binary
                , template-haskell
-               , mtl
+               , transformers
+               , monads-fd
                , data-binary-ieee754
                , cmdargs
                , filepath
@@ -68,7 +69,8 @@ executable tnt
                , containers
                , binary
                , template-haskell
-               , mtl
+               , transformers
+               , monads-fd
                , data-binary-ieee754
                , cmdargs
                , filepath

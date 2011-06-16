@@ -4,7 +4,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Control.Monad.ConstantPool
        ( module Control.Monad.ConstantPool.Class
        , ConstantPool
