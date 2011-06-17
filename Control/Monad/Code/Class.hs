@@ -25,6 +25,12 @@ class ReturnAddressOrReference a
 instance ReturnAddressOrReference ReturnAddress
 instance ReturnAddressOrReference Reference
 
+data Zero
+data Succ a
+
+type One = Succ Zero
+type Two = Succ One
+
 class Category a b | a -> b
 instance Category Int One
 instance Category Long Two
@@ -33,26 +39,27 @@ instance Category Double Two
 instance Category ReturnAddress One
 instance Category Reference One
 
-data Zero
-data Succ a
-
-type One = Succ Zero
-type Two = Succ One
-
-class Subtract a b c | a b -> c, b c -> a
+class Subtract a b c | a b -> c
 instance Subtract a Zero a
 instance Subtract a b a' => Subtract (Succ a) (Succ b) a'
 
-class Take a b c | a b -> c, b c -> a, c a -> b
-instance Take Zero b ()
-instance ( Category b b'
-         , Subtract (Succ a) b' a'
-         , Take a' c c'
-         ) => Take (Succ a) (b, c) (b, c')
+class Take a b c | a b -> c, c a -> b
+instance Take Zero xs ()
+instance ( Category x cat
+         , Subtract (Succ n) cat n'
+         , Take n' xs ys
+         ) => Take (Succ n) (x, xs) (x, ys)
 
-class Concat a b c | a b -> c, c a -> b
-instance Concat () a a
-instance Concat b c d => Concat (a, b) c (a, d)
+class Drop a b c | a b -> c, c a -> b
+instance Drop Zero xs xs
+instance ( Category x cat
+         , Subtract (Succ n) cat n'
+         , Drop n' xs ys
+         ) => Drop (Succ n) (x, xs) ys
+
+class Concat a b c | a b -> c
+instance Concat () ys ys
+instance Concat xs ys xs' => Concat (x, xs) ys (x, xs')
 
 class ParameterDesc a => Pop a b c | a b -> c, b c -> a, c a -> b
 instance Pop () a a
@@ -124,23 +131,16 @@ class Indexed.Monad m => MonadCode m where
   -- dstore :: Word16 -> t xs (Cons Double xs) (Label m)
   -- dsub :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
   dup :: Category value One => Operation m (value, xs) (value, (value, xs))
-  -- dup_x1 :: ( Category value1 ~ One
-  --           , Category value2 ~ One
-  --           ) =>
-  --           m
-  --           (Cons value1 (Cons value2 xs))
-  --           (Cons value1 (Cons value2 (Cons value1 xs)))
-  --           (Label m)
-  -- dup_x2 :: ( Category value1 ~ One
-  --           , (value2, xs') ~ SplitAt Two xs
-  --           ) =>
-  --           m
-  --           (Cons value1 xs)
-  --           (Cons value1 (Concat value2 (Cons value1 xs')))
-  --           (Label m)
-  dup2 :: ( Take Two xs value
-          , Concat value xs xs'
-          ) => Operation m xs xs'
+  dup_x1 :: ( Category x One
+            , Category y One
+            ) => Operation m (x, (y, xs)) (x, (y, (x, xs)))
+  dup_x2 :: ( Category x One
+            , Take Two xs y
+            , Drop Two xs ys
+            ) => Operation m (x, xs) (y, x, ys)
+  dup2 :: ( Take Two xs xs'
+          , Concat xs' xs ys
+          ) => Operation m xs ys
   -- dup2_x1 :: ( value1 ~ Take Two xs
   --            , (value2, xs') ~ SplitAt Three xs
   --            ) => t xs (Concat value2 (Concat value1 xs')) (Label m)
@@ -148,18 +148,21 @@ class Indexed.Monad m => MonadCode m where
   --            , (value2, xs') ~ SplitAt Four xs
   --            ) => t xs (Concat value2 (Concat value1 xs')) (Label m)
              
-  -- getfield :: Type value =>
-  --             String ->
-  --             String ->
-  --             value ->
-  --             t xs (Push value (Pop Reference xs)) (Label m)
-  getstatic :: ( FieldDesc value
-               , Push value xs xs'
+  getfield :: ( FieldDesc x
+              , Pop Reference xs xs'
+              , Push x xs' ys
+              ) =>
+              String ->
+              String ->
+              x ->
+              Operation m xs ys
+  getstatic :: ( FieldDesc x
+               , Push x xs ys
                ) =>
                String ->
                String ->
-               value ->
-               Operation m xs xs'
+               x ->
+               Operation m xs ys
   
   goto :: Label m xs -> Operation m xs xs
   
@@ -224,6 +227,10 @@ class Indexed.Monad m => MonadCode m where
   nop :: Operation m xs xs
   
   return :: Operation m xs xs
+  
+  swap :: ( Category x One
+          , Category y One
+          ) => Operation m (x, (y, xs)) (y, (x, xs))
   
 class MonadCode m => Ldc a b m | a -> b, b -> a where
   ldc :: b -> Operation m xs (a, xs)
