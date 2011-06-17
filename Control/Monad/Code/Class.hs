@@ -51,26 +51,23 @@ instance Subtract2 a b c => Subtract2 (S a) (S b) c
 class Subtract a b c | a b -> c, b c -> a, c a -> b
 instance (Subtract2 a b c, Add b c a) => Subtract a b c
 
-class Concat a b c | a b -> c, c a -> b
-instance Concat () ys ys
-instance Concat xs ys xs' => Concat (x, xs) ys (x, xs')
-
-class Take a b c | a b -> c, b c -> a, c a -> b
+class Take a b c | a b -> c
 instance Take Z xs ()
 instance ( Category x cat
          , Subtract (S n) cat n'
          , Take n' xs ys
          ) => Take (S n) (x, xs) (x, ys)
 
-class Drop2 a b c | a b -> c, c a -> b
-instance Drop2 Z xs xs
+class Concat a b c | a b -> c, c a -> b
+instance Concat () xs xs
+instance Concat xs ys xs' => Concat (x, xs) ys (x, xs')
+
+class Drop a b c | a b -> c
+instance Drop Z xs xs
 instance ( Category x cat
          , Subtract (S n) cat n'
-         , Drop2 n' xs ys
-         ) => Drop2(S n) (x, xs) ys
-
-class Drop a b c | a b -> c, b c -> a, c a -> b
-instance (Drop2 a b c, Take a b d, Concat d c b) => Drop a b c
+         , Drop n' xs ys
+         ) => Drop (S n) (x, xs) ys
 
 class ParameterDesc a => Pop a b c | a -> b c, b c -> a, c a -> b, b c -> a
 instance Pop () a a
