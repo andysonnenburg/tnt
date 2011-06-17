@@ -132,14 +132,21 @@ class Indexed.Monad m => MonadCode m where
   -- dreturn :: t (Cons Double xs) xs (Label m)
   -- dstore :: Word16 -> t xs (Cons Double xs) (Label m)
   -- dsub :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  dup :: Category value One => Operation m (value, xs) (value, (value, xs))
-  dup_x1 :: ( Category x One
-            , Category y One
-            ) => Operation m (x, (y, xs)) (x, (y, (x, xs)))
-  dup_x2 :: ( Category x One
+  dup :: ( Take One xs x
+         , Concat x xs xs'
+         , Concat x xs' ys
+         ) => Operation m xs ys
+  dup_x1 :: ( Take One xs x
             , Take Two xs y
-            , Drop Two xs ys
-            ) => Operation m (x, xs) (y, x, ys)
+            , Drop Two xs xs'
+            , Concat x xs' xs''
+            , Concat y xs'' ys
+            ) => Operation m xs ys
+  dup_x2 :: ( Take One xs x
+            , Take Three xs y
+            , Concat x xs xs'
+            , Concat y xs' ys
+            ) => Operation m xs ys
   dup2 :: ( Take Two xs xs'
           , Concat xs' xs ys
           ) => Operation m xs ys
@@ -244,6 +251,7 @@ class Indexed.Monad m => MonadCode m where
   swap :: ( Category x One
           , Category y One
           ) => Operation m (x, (y, xs)) (y, (x, xs))
+  
   
 class MonadCode m => Ldc a b m | a -> b, b -> a where
   ldc :: b -> Operation m xs (a, xs)
