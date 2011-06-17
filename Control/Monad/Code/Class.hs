@@ -21,13 +21,13 @@ import Data.Word
 import Prelude hiding (Double, Float, Int, return)
 import qualified Prelude
 
-data Zero
-data Succ a
+data Z
+data S a
 
-type One = Succ Zero
-type Two = Succ One
-type Three = Succ Two
-type Four = Succ Three
+type One = S Z
+type Two = S One
+type Three = S Two
+type Four = S Three
 
 class Category a b | a -> b
 instance Category Int One
@@ -37,29 +37,42 @@ instance Category Double Two
 instance Category ReturnAddress One
 instance Category Reference One
 
-class Subtract a b c | a b -> c
-instance Subtract a Zero a
-instance Subtract a b a' => Subtract (Succ a) (Succ b) a'
+class Add2 a b c | a b -> c, c a -> b
+instance Add2 Z a a
+instance Add2 a b c => Add2 (S a) b (S c)
 
-class Take a b c | a b -> c, b c -> a, c a -> b
-instance Take Zero xs ()
-instance ( Category x cat
-         , Subtract (Succ n) cat n'
-         , Take n' xs ys
-         ) => Take (Succ n) (x, xs) (x, ys)
+class Add a b c | a b -> c, b c -> a, c a -> b
+instance (Add2 a b c, Add2 b a c) => Add a b c
 
-class Drop a b c | a b -> c, c a -> b
-instance Drop Zero xs xs
-instance ( Category x cat
-         , Subtract (Succ n) cat n'
-         , Drop n' xs ys
-         ) => Drop (Succ n) (x, xs) ys
+class Subtract2 a b c | a b -> c, b c -> a
+instance Subtract2 a Z a
+instance Subtract2 a b c => Subtract2 (S a) (S b) c
+
+class Subtract a b c | a b -> c, b c -> a, c a -> b
+instance (Subtract2 a b c, Add b c a) => Subtract a b c
 
 class Concat a b c | a b -> c, c a -> b
 instance Concat () ys ys
 instance Concat xs ys xs' => Concat (x, xs) ys (x, xs')
 
-class ParameterDesc a => Pop a b c | a b -> c, b c -> a, c a -> b
+class Take a b c | a b -> c, b c -> a, c a -> b
+instance Take Z xs ()
+instance ( Category x cat
+         , Subtract (S n) cat n'
+         , Take n' xs ys
+         ) => Take (S n) (x, xs) (x, ys)
+
+class Drop2 a b c | a b -> c, c a -> b
+instance Drop2 Z xs xs
+instance ( Category x cat
+         , Subtract (S n) cat n'
+         , Drop2 n' xs ys
+         ) => Drop2(S n) (x, xs) ys
+
+class Drop a b c | a b -> c, b c -> a, c a -> b
+instance (Drop2 a b c, Take a b d, Concat d c b) => Drop a b c
+
+class ParameterDesc a => Pop a b c | a -> b c, b c -> a, c a -> b, b c -> a
 instance Pop () a a
 instance Pop Int (Int, a) a
 instance Pop Long (Long, a) a
@@ -68,7 +81,7 @@ instance Pop Double (Double, a) a
 instance Pop Reference (Reference, a) a
 instance ParameterDesc (a, b) => Pop (a, b) (a, (b, c)) c
 
-class ReturnDesc a => Push a b c | a b -> c, b c -> a, c a -> b
+class ReturnDesc a => Push a b c | a b -> c, b c -> a, c a -> b, a -> b c
 instance Push Int a (Int, a)
 instance Push Long a (Long, a)
 instance Push Float a (Float, a)
