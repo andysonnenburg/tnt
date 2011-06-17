@@ -1,15 +1,8 @@
 module Language.TNT.Token
-       ( module Language.TNT.Position
-       , Token (..)
-       , Value (..)
+       ( Token (..)
        ) where
 
-import Language.TNT.Position
-
-data Token = Token Value Position
-           | EOF deriving Show
-
-data Value = Name String
+data Token = Name String
            | String String
            | Import
            | Equals
@@ -18,4 +11,5 @@ data Value = Name String
            | OpenParen
            | CloseParen
            | Semi
-           | Newline deriving Show
+           | Newline
+           | EOF deriving Show

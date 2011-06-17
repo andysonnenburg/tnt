@@ -46,30 +46,29 @@ $alpha = [a-zA-Z]
 
 deriving instance Functor Alex
   
-type AlexUserState = ([Word8] -> [Word8], Position)
+type AlexUserState = [Word8] -> [Word8]
 
 name :: AlexAction (Alex Token)
 name (p, _, s) x = return a 
   where
-    a = Token (Name . toString $ BL.take (fromIntegral x) s) (fromAlexPosn p)
+    a = Name . toString $ BL.take (fromIntegral x) s
 
 beginString :: AlexAction (Alex Token)
-beginString (p, _, _) _ = alexSetUserState (id, fromAlexPosn p) >>
+beginString _ _ = alexSetUserState id >>
                           alexMonadScan
 
 char :: AlexAction (Alex Token)
 char (_, _, s) n = do
-  (f, p) <- alexGetUserState
-  alexSetUserState (f . g, p)
+  f <- alexGetUserState
+  alexSetUserState $ f . g
   alexMonadScan
   where
     g xs = BL.unpack (BL.take (fromIntegral n) s) ++ xs
 
 endString :: AlexAction (Alex Token)
-endString (_, _, _) _ = do
-  (f, p) <- alexGetUserState
-  let x = String . decode . f $ []
-  return $ Token x p
+endString _ _ = do
+  f <- alexGetUserState
+  return . String . decode . f $ []
 
 import' = token' Import
 equals = token' Equals
@@ -80,22 +79,19 @@ closeParen = token' CloseParen
 semi = token' Semi
 newline = token' Newline
 
-token' x (p, _, _) _ = return $ Token x $ fromAlexPosn p
+token' x _ _ = return x
 
 alexEOF :: Alex Token
 alexEOF = return EOF
 
 alexInitUserState :: AlexUserState
-alexInitUserState = (id, 0 :+: 0)
+alexInitUserState = id
 
 alexGetUserState :: Alex AlexUserState
 alexGetUserState = Alex $ \s@AlexState { alex_ust = ust} -> Right (s, ust)
 
 alexSetUserState :: AlexUserState -> Alex ()
 alexSetUserState ust = Alex $ \s -> Right (s { alex_ust = ust }, ())
-
-fromAlexPosn :: AlexPosn -> Position
-fromAlexPosn (AlexPn _ x y) = x :+: y
 
 toString :: ByteString -> String
 toString = decode . BL.unpack
