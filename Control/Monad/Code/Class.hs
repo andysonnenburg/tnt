@@ -21,15 +21,13 @@ import Data.Word
 import Prelude hiding (Double, Float, Int, return)
 import qualified Prelude
 
-class ReturnAddressOrReference a
-instance ReturnAddressOrReference ReturnAddress
-instance ReturnAddressOrReference Reference
-
 data Zero
 data Succ a
 
 type One = Succ Zero
 type Two = Succ One
+type Three = Succ Two
+type Four = Succ Three
 
 class Category a b | a -> b
 instance Category Int One
@@ -43,7 +41,7 @@ class Subtract a b c | a b -> c
 instance Subtract a Zero a
 instance Subtract a b a' => Subtract (Succ a) (Succ b) a'
 
-class Take a b c | a b -> c, c a -> b
+class Take a b c | a b -> c, b c -> a, c a -> b
 instance Take Zero xs ()
 instance ( Category x cat
          , Subtract (Succ n) cat n'
@@ -57,7 +55,7 @@ instance ( Category x cat
          , Drop n' xs ys
          ) => Drop (Succ n) (x, xs) ys
 
-class Concat a b c | a b -> c
+class Concat a b c | a b -> c, c a -> b
 instance Concat () ys ys
 instance Concat xs ys xs' => Concat (x, xs) ys (x, xs')
 
@@ -77,6 +75,10 @@ instance Push Float a (Float, a)
 instance Push Double a (Double, a)
 instance Push Reference a (Reference, a)
 instance Push Void a a
+
+class ReturnAddressOrReference a
+instance ReturnAddressOrReference ReturnAddress
+instance ReturnAddressOrReference Reference
 
 type Operation m p q = m p q (Label m p)
 
@@ -102,9 +104,9 @@ class Indexed.Monad m => MonadCode m where
   anewarray :: Operation m (Int, xs) (Reference, xs)
   areturn :: Operation m (Reference, xs) xs
   arraylength :: Operation m (Reference, xs) (Int, xs)
-  astore :: ReturnAddressOrReference objectref =>
+  astore :: ReturnAddressOrReference x =>
             Word16 ->
-            Operation m (objectref, xs) xs
+            Operation m (x, xs) xs
   athrow :: Operation m (Reference, xs) xs
   
   baload :: Operation m (Int, (Reference, xs)) (Int, xs)
@@ -141,28 +143,29 @@ class Indexed.Monad m => MonadCode m where
   dup2 :: ( Take Two xs xs'
           , Concat xs' xs ys
           ) => Operation m xs ys
-  -- dup2_x1 :: ( value1 ~ Take Two xs
-  --            , (value2, xs') ~ SplitAt Three xs
-  --            ) => t xs (Concat value2 (Concat value1 xs')) (Label m)
-  -- dup2_x2 :: ( value1 ~ Take Two xs
-  --            , (value2, xs') ~ SplitAt Four xs
-  --            ) => t xs (Concat value2 (Concat value1 xs')) (Label m)
+  dup2_x1 :: ( Take Two xs x
+             , Take Three xs y
+             , Drop Three xs xs'
+             , Concat x xs' xs''
+             , Concat y xs'' ys
+             ) => Operation m xs ys
+  dup2_x2 :: ( Take Two xs x
+             , Take Four xs y
+             , Drop Four xs xs'
+             , Concat x xs' xs''
+             , Concat y xs'' ys
+             ) => Operation m xs ys
              
-  getfield :: ( FieldDesc x
-              , Pop Reference xs xs'
-              , Push x xs' ys
-              ) =>
+  getfield :: FieldDesc x =>
               String ->
               String ->
               x ->
-              Operation m xs ys
-  getstatic :: ( FieldDesc x
-               , Push x xs ys
-               ) =>
+              Operation m (Reference, xs) (x, xs)
+  getstatic :: FieldDesc x =>
                String ->
                String ->
                x ->
-               Operation m xs ys
+               Operation m xs (x, xs)
   
   goto :: Label m xs -> Operation m xs xs
   
@@ -181,35 +184,45 @@ class Indexed.Monad m => MonadCode m where
                      , ReturnDesc return
                      , Pop parameters xs xs'
                      , Pop Reference xs' xs''
-                     , Push return xs'' xs'''
+                     , Push return xs'' ys
                      ) =>
                      String ->
                      String ->
                      parameters ->
                      return ->
-                     Operation m xs xs'''
+                     Operation m xs ys
   invokespecial :: ( ParameterDesc parameters
                    , ReturnDesc return
                    , Pop parameters xs xs'
                    , Pop Reference xs' xs''
-                   , Push return xs'' xs'''
+                   , Push return xs'' ys
                    ) =>
                    String ->
                    String ->
                    parameters ->
                    return ->
-                   Operation m xs xs'''
+                   Operation m xs ys
+  invokestatic :: ( ParameterDesc parameters
+                  , ReturnDesc return
+                  , Pop parameters xs xs'
+                  , Push return xs' ys
+                  ) =>
+                  String ->
+                  String ->
+                  parameters ->
+                  return -> 
+                  Operation m xs ys
   invokevirtual :: ( ParameterDesc parameters
                    , ReturnDesc return
                    , Pop parameters xs xs'
                    , Pop Reference xs' xs''
-                   , Push return xs'' xs'''
+                   , Push return xs'' ys
                    ) =>
                    String ->
                    String ->
                    parameters ->
                    return ->
-                   Operation m xs xs'''
+                   Operation m xs ys
   
   istore :: Word16 -> Operation m (Int, xs) xs
   
