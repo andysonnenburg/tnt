@@ -25,26 +25,13 @@ class ReturnAddressOrReference a
 instance ReturnAddressOrReference ReturnAddress
 instance ReturnAddressOrReference Reference
 
-class CategoryF a where
-  type Category a
-
-instance CategoryF Int where
-  type Category Int = One
-
-instance CategoryF Long where
-  type Category Long = Two
-
-instance CategoryF Float where
-  type Category Float = One
-  
-instance CategoryF Double where
-  type Category Double = Two
-
-instance CategoryF ReturnAddress where
-  type Category ReturnAddress = One
-
-instance CategoryF Reference where
-  type Category Reference = One
+class Category a b | a -> b
+instance Category Int One
+instance Category Long Two
+instance Category Float One
+instance Category Double Two
+instance Category ReturnAddress One
+instance Category Reference One
 
 data Zero
 data Succ a
@@ -52,92 +39,37 @@ data Succ a
 type One = Succ Zero
 type Two = Succ One
 
-class SubtractF a b where
-  type Subtract a b
+class Subtract a b c | a b -> c, b c -> a
+instance Subtract a Zero a
+instance Subtract a b a' => Subtract (Succ a) (Succ b) a'
 
-instance SubtractF a Zero where
-  type Subtract a Zero = a
+class Take a b c | a b -> c, b c -> a, c a -> b
+instance Take Zero b ()
+instance ( Category b b'
+         , Subtract (Succ a) b' a'
+         , Take a' c c'
+         ) => Take (Succ a) (b, c) (b, c')
 
-instance SubtractF (Succ a) (Succ b) where
-  type Subtract (Succ a) (Succ b) = Subtract a b
+class Concat a b c | a b -> c, c a -> b
+instance Concat () a a
+instance Concat b c d => Concat (a, b) c (a, d)
 
-class TakeF a b where
-  type Take a b
+class ParameterDesc a => Pop a b c | a b -> c, b c -> a, c a -> b
+instance Pop () a a
+instance Pop Int (Int, a) a
+instance Pop Long (Long, a) a
+instance Pop Float (Float, a) a
+instance Pop Double (Double, a) a
+instance Pop Reference (Reference, a) a
+instance ParameterDesc (a, b) => Pop (a, b) (a, (b, c)) c
 
-instance TakeF Zero b where
-  type Take Zero b = ()
-
-instance TakeF (Succ a) (b, c) where
-  type Take (Succ a) (b, c) = (b, Take (Subtract (Succ a) (Category b)) c)
-
-class DropF a b where
-  type Drop a b
-
-instance DropF Zero b where
-  type Drop Zero b = b
-
-instance DropF (Succ a) (b, c) where
-  type Drop (Succ a) (b, c) = Drop (Subtract (Succ a) (Category b)) c
-
-class SplitAtF a b where
-  type SplitAt a b
-
-instance SplitAtF a b where
-  type SplitAt a b = (Take a b, Drop a b)
-
-class ConcatF a b where
-  type Concat a b
-
-instance ConcatF () a where
-  type Concat () a = a
-
-instance ConcatF (a, b) c where
-  type Concat (a, b) c = (a, Concat b c)
-
-class ParameterDesc a => PopF a b where
-  type Pop a b
-
-instance PopF () a where
-  type Pop () a = a
-
-instance PopF Int (Int, a) where
-  type Pop Int (Int, a) = a
-
-instance PopF Long (Long, a) where
-  type Pop Long (Long, a) = a
-
-instance PopF Float (Float, a) where
-  type Pop Float (Float, a) = a
-  
-instance PopF Double (Double, a) where
-  type Pop Double (Double, a) = a
-
-instance PopF Reference (Reference, a) where
-  type Pop Reference (Reference, a) = a
-  
-instance ParameterDesc (a, b) => PopF (a, b) (a, (b, c)) where
-  type Pop (a, b) (a, (b, c)) = c
-
-class ReturnDesc a => PushF a b where
-  type Push a b
-
-instance PushF Void a where
-  type Push Void a = a
-
-instance PushF Int a where
-  type Push Int a = (Int, a)
-
-instance PushF Long a where
-  type Push Long a = (Long, a)
-
-instance PushF Float a where
-  type Push Float a = (Float, a)
-
-instance PushF Double a where
-  type Push Double a = (Double, a)
-
-instance PushF Reference a where
-  type Push Reference a = (Reference, a)
+class ReturnDesc a => Push a b c | a b -> c, b c -> a, c a -> b
+instance Push Int a (Int, a)
+instance Push Long a (Long, a)
+instance Push Float a (Float, a)
+instance Push Double a (Double, a)
+instance Push Reference a (Reference, a)
+instance Push Void a a
 
 type Operation m p q = m p q (Label m p)
 
@@ -191,7 +123,7 @@ class Indexed.Monad m => MonadCode m where
   -- dreturn :: t (Cons Double xs) xs (Label m)
   -- dstore :: Word16 -> t xs (Cons Double xs) (Label m)
   -- dsub :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  dup :: Category value ~ One => Operation m (value, xs) (value, (value, xs))
+  dup :: Category value One => Operation m (value, xs) (value, (value, xs))
   -- dup_x1 :: ( Category value1 ~ One
   --           , Category value2 ~ One
   --           ) =>
@@ -206,7 +138,9 @@ class Indexed.Monad m => MonadCode m where
   --           (Cons value1 xs)
   --           (Cons value1 (Concat value2 (Cons value1 xs')))
   --           (Label m)
-  dup2 :: (value ~ Take Two xs) => Operation m xs (Concat value xs)
+  dup2 :: ( Take Two xs value
+          , Concat value xs xs'
+          ) => Operation m xs xs'
   -- dup2_x1 :: ( value1 ~ Take Two xs
   --            , (value2, xs') ~ SplitAt Three xs
   --            ) => t xs (Concat value2 (Concat value1 xs')) (Label m)
@@ -219,11 +153,13 @@ class Indexed.Monad m => MonadCode m where
   --             String ->
   --             value ->
   --             t xs (Push value (Pop Reference xs)) (Label m)
-  getstatic :: FieldDesc value =>
+  getstatic :: ( FieldDesc value
+               , Push value xs xs'
+               ) =>
                String ->
                String ->
                value ->
-               Operation m xs (Push value xs)
+               Operation m xs xs'
   
   goto :: Label m xs -> Operation m xs xs
   
@@ -238,30 +174,39 @@ class Indexed.Monad m => MonadCode m where
   
   iload :: Word16 -> Operation m xs (Int, xs)
   
-  invokeinterface :: ( ParameterDesc args  
-                     , ReturnDesc result
+  invokeinterface :: ( ParameterDesc parameters  
+                     , ReturnDesc return
+                     , Pop parameters xs xs'
+                     , Pop Reference xs' xs''
+                     , Push return xs'' xs'''
                      ) =>
                      String ->
                      String ->
-                     args ->
-                     result ->
-                     Operation m xs (Push result (Pop Reference (Pop args xs)))
-  invokespecial :: ( ParameterDesc args
-                   , ReturnDesc result
+                     parameters ->
+                     return ->
+                     Operation m xs xs'''
+  invokespecial :: ( ParameterDesc parameters
+                   , ReturnDesc return
+                   , Pop parameters xs xs'
+                   , Pop Reference xs' xs''
+                   , Push return xs'' xs'''
                    ) =>
                    String ->
                    String ->
-                   args ->
-                   result ->
-                   Operation m xs (Push result (Pop Reference (Pop args xs)))
-  invokevirtual :: ( ParameterDesc args
-                   , ReturnDesc result
+                   parameters ->
+                   return ->
+                   Operation m xs xs'''
+  invokevirtual :: ( ParameterDesc parameters
+                   , ReturnDesc return
+                   , Pop parameters xs xs'
+                   , Pop Reference xs' xs''
+                   , Push return xs'' xs'''
                    ) =>
                    String ->
                    String ->
-                   args ->
-                   result ->
-                   Operation m xs (Push result (Pop Reference (Pop args xs)))
+                   parameters ->
+                   return ->
+                   Operation m xs xs'''
   
   istore :: Word16 -> Operation m (Int, xs) xs
   

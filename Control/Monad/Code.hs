@@ -39,7 +39,7 @@ import Prelude hiding (Double, Float, Int, return)
 
 type Code s = CodeT s (ConstantPoolT Version)
 
-runCode :: forall s parameters result a.
+runCode :: forall s parameters result i a.
            ( ParameterDesc parameters
            , ReturnDesc result
            ) =>
@@ -47,11 +47,11 @@ runCode :: forall s parameters result a.
            String ->
            parameters ->
            result ->
-           Code s () () a ->
+           Code s () i a ->
            ConstantPoolT Version (a, MethodInfo)
 runCode = runCodeT
 
-execCode :: forall s parameters result a.
+execCode :: forall s parameters result i a.
             ( ParameterDesc parameters
             , ReturnDesc result
             ) =>
@@ -59,7 +59,7 @@ execCode :: forall s parameters result a.
             String ->
             parameters ->
             result ->
-            Code s () () a ->
+            Code s () i a ->
             ConstantPoolT Version MethodInfo
 execCode = execCodeT
 
@@ -117,7 +117,7 @@ instance Monad m => Indexed.Monad (CodeT s m) where
   
   ifail = CodeT . fail
 
-runCodeT :: forall s parameters result m a.
+runCodeT :: forall s parameters result m i a.
             ( ParameterDesc parameters
             , ReturnDesc result
             , MonadConstantPool m
@@ -126,7 +126,7 @@ runCodeT :: forall s parameters result m a.
             String ->
             parameters ->
             result ->
-            CodeT s m () () a ->
+            CodeT s m () i a ->
             m (a, MethodInfo)
 runCodeT access name args result (CodeT m) = do
   a :+: S _ ms ml _ c <- runStateT m initState
@@ -134,7 +134,7 @@ runCodeT access name args result (CodeT m) = do
   method <- methodM access name args result [codeAttribute]
   return (a, method)
 
-execCodeT :: forall s parameters result m a.
+execCodeT :: forall s parameters result m i a.
              ( ParameterDesc parameters
              , ReturnDesc result
              , MonadConstantPool m
@@ -143,7 +143,7 @@ execCodeT :: forall s parameters result m a.
              String ->
              parameters ->
              result ->
-             CodeT s m () () a ->
+             CodeT s m () i a ->
              m MethodInfo
 execCodeT access name parameters result =
   liftM snd . runCodeT access name parameters result

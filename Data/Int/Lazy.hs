@@ -1,0 +1,1 @@
+module Data.Int.Lazy (Int) where
