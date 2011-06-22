@@ -15,6 +15,7 @@ import Data.ClassFile
 import Data.ClassFile.Access
 import Data.Monoid
 
+import Language.Brainfuck.Command
 import Language.Brainfuck.Emitter
 import Language.Brainfuck.Optimizer
 import Language.Brainfuck.Parser
@@ -25,10 +26,9 @@ compile :: String -> ByteString -> Either String ByteString
 compile className = liftM f . parse
   where
     f x =
-      let x' = emit x >> M.return ()
+      let x' = (emit' . optimize) x >> M.return ()
           x'' = toClassFile className x'
-          x''' = putClassFile x''
-      in runPut x'''
+      in runPut . putClassFile $ x''
 
 toClassFile :: String -> (forall s. Code s () i ()) -> ClassFile
 toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
@@ -57,3 +57,6 @@ toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
     , execCode (mconcat [public, final]) "run" ()V (x >> M.return ())
     ]
     []
+
+emit' :: [Command] -> Code s () () (Label (Code s) ())
+emit' = emit

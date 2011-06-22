@@ -13,13 +13,13 @@ import Prelude (String)
 infixl 1 >>, >>=
 
 (>>=) :: Monad m => m i j a -> (a -> m j k b) -> m i k b
-(>>=) = ibind
+(>>=) = thenM
 
 (>>) :: Monad m => m i j a -> m j k b -> m i k b
-(>>) = ithen
+(>>) = thenM_
 
 return :: Monad m => a -> m i i a
-return = ireturn
+return = returnM
 
 fail :: Monad m => String -> m i j a
-fail = ifail
+fail = failM

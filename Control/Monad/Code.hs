@@ -115,13 +115,13 @@ instance MonadState s m => MonadState s (CodeT s' m i j) where
   put = CodeT . lift . State.put
 
 instance Monad m => Indexed.Monad (CodeT s m) where
-  ireturn = CodeT . return
-  {-# INLINE ireturn #-}
+  returnM = CodeT . return
+  {-# INLINE returnM #-}
   
-  m `ibind` k = CodeT $ unCodeT m >>= unCodeT . k
-  {-# INLINE ibind #-}
+  m `thenM` k = CodeT $ unCodeT m >>= unCodeT . k
+  {-# INLINE thenM #-}
   
-  ifail = CodeT . fail
+  failM = CodeT . fail
 
 runCodeT :: ( ParameterDesc parameters
             , ReturnDesc result
@@ -267,11 +267,11 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
         putWord8 Opcode.iinc
         putWord16be local
         putWord16be . fromIntegral $ cnst
-    | otherwise = iload local `ibind` \label ->
-                  ldc cnst `ithen`
-                  iadd `ithen`
-                  istore local `ithen`
-                  ireturn label
+    | otherwise = iload local `thenM` \label ->
+                  ldc cnst `thenM_`
+                  iadd `thenM_`
+                  istore local `thenM_`
+                  returnM label
 
   iload j = case j of
     0 -> insn' 1 1 1 $ putWord8 Opcode.iload_0
