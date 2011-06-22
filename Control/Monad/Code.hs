@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -43,8 +43,7 @@ import Prelude hiding (Double, Float, Int, return)
 
 type Code s = CodeT s (ConstantPoolT Version)
 
-runCode :: forall parameters result i a.
-           ( ParameterDesc parameters
+runCode :: ( ParameterDesc parameters
            , ReturnDesc result
            ) =>
            MethodAccess ->
@@ -55,8 +54,7 @@ runCode :: forall parameters result i a.
            ConstantPoolT Version (a, MethodInfo)
 runCode = runCodeT
 
-execCode :: forall parameters result i a.
-            ( ParameterDesc parameters
+execCode :: ( ParameterDesc parameters
             , ReturnDesc result
             ) =>
             MethodAccess ->
@@ -125,8 +123,7 @@ instance Monad m => Indexed.Monad (CodeT s m) where
   
   ifail = CodeT . fail
 
-runCodeT :: forall parameters result m i a.
-            ( ParameterDesc parameters
+runCodeT :: ( ParameterDesc parameters
             , ReturnDesc result
             , MonadConstantPool m
             ) =>
@@ -142,8 +139,7 @@ runCodeT access name args result (CodeT m) = do
   method <- methodM access name args result [codeAttribute]
   return (a, method)
 
-execCodeT :: forall parameters result m i a.
-             ( ParameterDesc parameters
+execCodeT :: ( ParameterDesc parameters
              , ReturnDesc result
              , MonadConstantPool m
              ) =>
@@ -164,7 +160,7 @@ initState = S { stack = 0
               , code = return ()
               }
 
-instance (MonadFix m, MonadConstantPool m) => MonadCode (CodeT s m) where
+instance MonadConstantPool m => MonadCode (CodeT s m) where
   
   newtype Label (CodeT s m) xs = Label Int32
 

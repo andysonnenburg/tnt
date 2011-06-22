@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, RebindableSyntax #-}
+{-# LANGUAGE ImpredicativeTypes, RankNTypes, RebindableSyntax #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Language.Brainfuck.Compiler (compile) where
 
@@ -24,13 +24,13 @@ import Prelude hiding (Monad (..))
 compile :: String -> ByteString -> Either String ByteString
 compile className = liftM f . parse
   where
-    f = runPut .
-        putClassFile .
-        toClassFile className .
-        emit .
-        optimize
+    f x =
+      let x' = emit x >> M.return ()
+          x'' = toClassFile className x'
+          x''' = putClassFile x''
+      in runPut x'''
 
-toClassFile :: forall i a. String -> (forall s. Code s () i a) -> ClassFile
+toClassFile :: String -> (forall s. Code s () i ()) -> ClassFile
 toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
   classM (mconcat [ public
                   , final
@@ -54,6 +54,6 @@ toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
         invokevirtual className "run" ()V
         return
         M.return ()
-    , execCode (mconcat [public, final]) "run" ()V x
+    , execCode (mconcat [public, final]) "run" ()V (x >> M.return ())
     ]
     []

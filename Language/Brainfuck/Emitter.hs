@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonomorphismRestriction, RankNTypes, RebindableSyntax #-}
+{-# LANGUAGE NoMonomorphismRestriction, Rank2Types, RebindableSyntax #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-unused-do-bind #-}
 module Language.Brainfuck.Emitter (emit) where
 
@@ -15,9 +15,7 @@ import Language.Brainfuck.Command
 
 import Prelude hiding (Monad (..))
 
-emit :: ( MonadFix (m () ())
-        , MonadCode m
-        ) => [Command] -> m () () (Label m ())
+emit :: [Command] -> Code s () () (Label (Code s) ())
 emit xs = do
   label <- emitHeader
   forM_ xs emitCommand
