@@ -84,6 +84,10 @@ instance Desc () where
   descs _ = id
   stackSize _ = 0
 
+instance FieldType a => Desc [a] where
+  descs = undefined
+  stackSize = foldl' ((. stackSize) . (+)) 0
+
 class Desc a => FieldType a
 instance FieldType Int
 instance FieldType Long
@@ -104,6 +108,7 @@ instance ParameterDesc Float
 instance ParameterDesc Double
 instance ParameterDesc Reference
 instance ParameterDesc ()
+instance (FieldType a, Desc [a]) => ParameterDesc [a]
 
 $(do
   let n = min 255 maxTupleSize

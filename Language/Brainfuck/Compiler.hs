@@ -1,4 +1,4 @@
-{-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE RankNTypes, RebindableSyntax #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Language.Brainfuck.Compiler (compile) where
 
@@ -6,6 +6,7 @@ import Control.Monad hiding (Monad (..))
 import Control.Monad.Code
 import Control.Monad.ConstantPool
 import Control.Monad.Indexed hiding (return)
+import qualified Control.Monad.Indexed as M
 import Control.Monad.Version
 
 import Data.Binary.Put
@@ -29,7 +30,7 @@ compile className = liftM f . parse
         emit .
         optimize
 
-toClassFile :: String -> Code s () () a -> ClassFile
+toClassFile :: forall i a. String -> (forall s. Code s () i a) -> ClassFile
 toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
   classM (mconcat [ public
                   , final
@@ -41,6 +42,7 @@ toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
         aload 0
         invokespecial "java/lang/Object" "<init>" ()V
         return
+        M.return ()
     , execCode
       (mconcat [ public
                , static
@@ -51,6 +53,7 @@ toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
         invokespecial className "<init>" ()V
         invokevirtual className "run" ()V
         return
-    , execCode (mconcat [public, final]) "run" ()V x
+        M.return ()
+    -- , execCode (mconcat [public, final]) "run" ()V x
     ]
     []

@@ -1,8 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Code
@@ -26,6 +28,8 @@ import Control.Monad.ConstantPool
 import Control.Monad.Fix
 import Control.Monad.Indexed.Class hiding (Monad)
 import qualified Control.Monad.Indexed.Class as Indexed
+import Control.Monad.State.Class (MonadState)
+import qualified Control.Monad.State.Class as State
 import Control.Monad.Version
 
 import Data.Binary.Put
@@ -39,7 +43,7 @@ import Prelude hiding (Double, Float, Int, return)
 
 type Code s = CodeT s (ConstantPoolT Version)
 
-runCode :: forall s parameters result i a.
+runCode :: forall parameters result i a.
            ( ParameterDesc parameters
            , ReturnDesc result
            ) =>
@@ -47,11 +51,11 @@ runCode :: forall s parameters result i a.
            String ->
            parameters ->
            result ->
-           Code s () i a ->
+           (forall s. Code s () i a) ->
            ConstantPoolT Version (a, MethodInfo)
 runCode = runCodeT
 
-execCode :: forall s parameters result i a.
+execCode :: forall parameters result i a.
             ( ParameterDesc parameters
             , ReturnDesc result
             ) =>
@@ -59,7 +63,7 @@ execCode :: forall s parameters result i a.
             String ->
             parameters ->
             result ->
-            Code s () i a ->
+            (forall s. Code s () i a) ->
             ConstantPoolT Version MethodInfo
 execCode = execCodeT
 
@@ -108,6 +112,10 @@ newtype CodeT s m i j a = CodeT
                                      , MonadFix
                                      )
 
+instance MonadState s m => MonadState s (CodeT s' m i j) where
+  get = CodeT . lift $ State.get
+  put = CodeT . lift . State.put
+
 instance Monad m => Indexed.Monad (CodeT s m) where
   ireturn = CodeT . return
   {-# INLINE ireturn #-}
@@ -117,7 +125,7 @@ instance Monad m => Indexed.Monad (CodeT s m) where
   
   ifail = CodeT . fail
 
-runCodeT :: forall s parameters result m i a.
+runCodeT :: forall parameters result m i a.
             ( ParameterDesc parameters
             , ReturnDesc result
             , MonadConstantPool m
@@ -126,7 +134,7 @@ runCodeT :: forall s parameters result m i a.
             String ->
             parameters ->
             result ->
-            CodeT s m () i a ->
+            (forall s. CodeT s m () i a) ->
             m (a, MethodInfo)
 runCodeT access name args result (CodeT m) = do
   a :+: S _ ms ml _ c <- runStateT m initState
@@ -134,7 +142,7 @@ runCodeT access name args result (CodeT m) = do
   method <- methodM access name args result [codeAttribute]
   return (a, method)
 
-execCodeT :: forall s parameters result m i a.
+execCodeT :: forall parameters result m i a.
              ( ParameterDesc parameters
              , ReturnDesc result
              , MonadConstantPool m
@@ -143,7 +151,7 @@ execCodeT :: forall s parameters result m i a.
              String ->
              parameters ->
              result ->
-             CodeT s m () i a ->
+             (forall s. CodeT s m () i a) ->
              m MethodInfo
 execCodeT access name parameters result =
   liftM snd . runCodeT access name parameters result

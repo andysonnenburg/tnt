@@ -69,7 +69,7 @@ instance ( Category x cat
          , Drop n' xs ys
          ) => Drop (S n) (x, xs) ys
 
-class ParameterDesc a => Pop a b c | a -> b c, b c -> a, c a -> b, b c -> a
+class ParameterDesc a => Pop a b c | a b -> c
 instance Pop () a a
 instance Pop Int (Int, a) a
 instance Pop Long (Long, a) a
@@ -78,7 +78,7 @@ instance Pop Double (Double, a) a
 instance Pop Reference (Reference, a) a
 instance ParameterDesc (a, b) => Pop (a, b) (a, (b, c)) c
 
-class ReturnDesc a => Push a b c | a b -> c, b c -> a, c a -> b, a -> b c
+class ReturnDesc a => Push a b c | a b -> c, b c -> a, c a -> b
 instance Push Int a (Int, a)
 instance Push Long a (Long, a)
 instance Push Float a (Float, a)
@@ -111,7 +111,7 @@ class Indexed.Monad m => MonadCode m where
   aastore :: Operation m (Reference, (Int, (Reference, xs))) xs
   aconst_null :: Operation m xs (Reference, xs)
   aload :: Word16 -> Operation m xs (Reference, xs)
-  anewarray :: Operation m (Int, xs) (Reference, xs)
+  anewarray :: String -> Operation m (Int, xs) (Reference, xs)
   areturn :: Operation m (Reference, xs) xs
   arraylength :: Operation m (Reference, xs) (Int, xs)
   astore :: ReturnAddressOrReference x =>
@@ -124,7 +124,7 @@ class Indexed.Monad m => MonadCode m where
   
   -- caload :: t (Cons Int (Cons Reference xs)) (Cons Int xs) (Label m)
   -- castore :: t (Cons Int (Cons Int (Cons Reference xs))) xs (Label m)
-  -- checkcast :: Reference -> t (Cons Reference xs) (Cons Reference xs) (Label m)
+  checkcast :: String -> Operation m (Reference, xs) (Reference, xs)
   
   -- d2f :: t (Cons Double xs) (Cons Float xs) (Label m)
   -- d2i :: t (Cons Double xs) (Cons Int xs) (Label m)
@@ -256,6 +256,8 @@ class Indexed.Monad m => MonadCode m where
   newarray :: ArrayType m -> Operation m (Int, xs) (Reference, xs)
   nop :: Operation m xs xs
   
+  pop :: Category x One => Operation m (x, xs) xs
+
   return :: Operation m xs xs
   
   swap :: ( Category x One

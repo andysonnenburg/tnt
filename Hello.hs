@@ -5,6 +5,7 @@ module Main (main) where
 import Control.Monad.Code
 import Control.Monad.ConstantPool
 import Control.Monad.Indexed hiding (return)
+import qualified Control.Monad.Indexed as M
 import Control.Monad.Version
 
 import Data.Binary.Put
@@ -37,5 +38,6 @@ main =
           ldc "hello, world"
           invokevirtual "java/io/PrintStream" "println" (L"java/lang/String")V
           return
+          M.return ()
       ]
       []

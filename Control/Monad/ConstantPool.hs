@@ -59,6 +59,10 @@ deriving instance MonadError e m => MonadError e (ConstantPoolT m)
 deriving instance MonadReader r m => MonadReader r (ConstantPoolT m)
 deriving instance MonadWriter w m => MonadWriter w (ConstantPoolT m)
 
+instance MonadState s m => MonadState s (ConstantPoolT m) where
+  get = ConstantPoolT . lift $ get
+  put = ConstantPoolT . lift . put
+
 instance MonadVersion m => MonadVersion (ConstantPoolT m) where
   getMinorVersion = ConstantPoolT . lift $ getMinorVersion
   getMajorVersion = ConstantPoolT . lift $ getMajorVersion
