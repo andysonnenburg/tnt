@@ -54,6 +54,6 @@ toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
         invokevirtual className "run" ()V
         return
         M.return ()
-    -- , execCode (mconcat [public, final]) "run" ()V x
+    , execCode (mconcat [public, final]) "run" ()V x
     ]
     []
