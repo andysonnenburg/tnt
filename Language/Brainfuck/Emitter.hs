@@ -15,7 +15,9 @@ import Language.Brainfuck.Command
 
 import Prelude hiding (Monad (..))
 
-emit :: [Command] -> Code s () () (Label (Code s) ())
+emit :: ( MonadFix m
+        , MonadConstantPool m
+        ) => [Command] -> CodeT s m () () (Label (CodeT s m) ())
 emit xs = do
   label <- emitHeader
   forM_ xs emitCommand
