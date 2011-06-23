@@ -18,7 +18,6 @@ import Data.Monoid
 import System.IO
 
 import Prelude hiding (Monad (..))
-import qualified Prelude
 
 main :: IO ()
 main =
