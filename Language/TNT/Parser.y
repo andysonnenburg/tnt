@@ -1,33 +1,48 @@
 {
-{-# OPTIONS_GHC -fspec-constr-count=12 #-}
+{-# OPTIONS_GHC -fspec-constr-count=21 #-}
 module Language.TNT.Parser (parse) where
 
 import Control.Applicative
 
 import Data.Maybe
 
-import Language.TNT.Expression
-import qualified Language.TNT.Expression as Expression
 import Language.TNT.Lexer
-import Language.TNT.Statement
-import qualified Language.TNT.Statement as Statement
-import Language.TNT.Token
-import qualified Language.TNT.Token as Token
+import Language.TNT.Stmt as Stmt
+import Language.TNT.Token as Token
+
+import Prelude hiding (Ordering (..))
 }
 
 %tokentype { Token }
 
 %token
   IMPORT { Token.Import }
+  AS { As }
+  VAR { Token.Var }
+  FUN { Token.Fun }
+  IF { If }
+  ELSE { Else }
+  FOR { Token.For }
+  IN { In }
+  RETURN { Token.Return }
   STRING { Token.String $$ }
   NAME { Name $$ }
-  '=' { Equals }
+  '=' { Equal }
+  "==" { EQ }
+  "!=" { NE }
+  '<' { LT }
+  "<=" { LE }
+  '>' { GT }
+  ">=" { GE }
   '.' { Dot }
   ',' { Comma }
   '(' { OpenParen }
   ')' { CloseParen }
+  '{' { OpenBrace }
+  '}' { CloseBrace }
+  '[' { OpenBracket }
+  ']' { CloseBracket }
   ';' { Semi }
-  '\n' { Newline }
 
 %name parser
 
@@ -39,60 +54,130 @@ import qualified Language.TNT.Token as Token
 
 %%
 
-some_statements : some_reversed_statements { reverse $ $1 }
+many_stmts :: { [Stmt String] }
+  : many_reversed_stmts { reverse $1 }
 
-some_reversed_statements : statement { [$1] }
-                         | some_reversed_statements terminator statement {
-                             $3 : $1
-                           }
+many_reversed_stmts :: { [Stmt String] }
+  : { [] }
+  | many_reversed_stmts stmt {
+      $2 : $1
+    }
 
-many_expressions : many_reversed_expressions { reverse $1 }
+many_exprs :: { [Expr String] } 
+  : many_reversed_exprs { reverse $1 }
 
-many_reversed_expressions : { [] }
-                          | expression { [$1] }
-                          | many_reversed_expressions ',' expression {
-                              $3 : $1
-                            }
+many_reversed_exprs :: { [Expr String] } 
+  : { [] }
+  | expr { [$1] }
+  | many_reversed_exprs ',' expr {
+      $3 : $1
+    }
 
-statement : { Empty }
-          | import { Statement.Import $1 }
-          | expression { Expression $1 }
+many_names :: { [String] }
+  : many_reversed_names { reverse $1 }
 
-expression : string { $1 }
-           | variable { $1 }
-           | access { $1 }
-           | mutate { $1 }
-           | assign { $1 }
-           | invoke { $1 }
+many_reversed_names :: { [String] }
+  : { [] }
+  | NAME { [$1] }
+  | many_reversed_names ',' NAME { $3 : $1 }
 
-terminator : ';' {}
-           | '\n' {}
+stmt :: { Stmt String }
+  : import ';' { $1 }
+  | decl ';' { $1 }
+  | if { $1 }
+  | for { $1 }
+  | forEach { $1 }
+  | return ';' { $1 }
+  | expr ';' { Expr $1 }
 
-import : IMPORT qualified_name { $2 "" }
+import :: { Stmt String }
+  : IMPORT split_qualified_name { Stmt.Import (fst $2) (snd $2) }
+  | IMPORT qualified_name AS NAME { Stmt.Import ($2 "") $4 }
 
-string : STRING { Expression.String $1 }
+decl :: { Stmt String }
+  : VAR NAME '=' expr { Decl $2 $4 }
+  | FUN NAME '(' many_names ')' '{' many_stmts '}' { Decl $2 (Stmt.Fun $4 $7) }
 
-variable : NAME { Variable $1 }
+if :: { Stmt String }
+  : IF '(' expr ')' '{' many_stmts '}' { IfThen $3 $6 }
+  | IF '(' expr ')' '{' many_stmts '}' ELSE '{' many_stmts '}' {
+      IfThenElse $3 $6 $10
+    }
 
-access : expression '.' NAME { Access $1 $3 }
+for :: { Stmt String }
+  : FOR '(' stmt ';' expr ';' expr ')' '{' many_stmts '}' {
+      Stmt.For $3 $5 $7 $10
+    }
 
-mutate : expression '.' NAME '=' expression { Mutate $1 $3 $5 }
+forEach :: { Stmt String }
+  : FOR '(' NAME IN expr ')' '{' many_stmts '}' {
+      Stmt.ForEach $3 $5 $8
+    }
 
-assign : NAME '=' expression { Assign $1 $3 }
+return :: { Stmt String }
+  : RETURN expr { Stmt.Return $2 }
 
-invoke : expression '(' many_expressions ')' {
-    Invoke $1 $3
+expr :: { Expr String }
+  : var { $1 }
+  | fun { $1 }
+  | string { $1 }
+  | access { $1 }
+  | mutate { $1 }
+  | assign { $1 }
+  | app { $1 }
+  | list { $1 }
+  | compare { $1 }
+
+string
+  : STRING { Stmt.String $1 }
+
+var
+  : NAME { Stmt.Var $1 }
+
+fun
+  : FUN '(' many_names ')' '{' many_stmts '}' { Stmt.Fun $3 $6 }
+
+access
+  : expr '.' NAME { Access $1 $3 }
+
+mutate
+  : expr '.' NAME '=' expr { Mutate $1 $3 $5 }
+
+assign
+  : NAME '=' expr { Assign $1 $3 }
+
+app
+  : expr '(' many_exprs ')' {
+    App $1 $3
   }
+
+list
+  : '[' many_exprs ']' { List $2 }
+
+compare
+  : expr compareOperator expr { App (Access $1 $2) [$3] }
+
+compareOperator
+  : "==" { "eq" }
+  | "!=" { "ne" }
+  | '<' { "lt" }
+  | "<=" { "le" }
+  | '>' { "gt" }
+  | ">=" { "ge" }
 
 qualified_name : NAME { showString $1 }
                | qualified_name '.' NAME { $1 . showChar '/' . showString $3 }
 
+split_qualified_name
+  : NAME { ($1, $1) }
+  | qualified_name '.' NAME { ($1 . showChar '/' . showString $3 $ "", $3) }
+
 {
 parse = flip runAlex parser
   
-parseError _ = do
-  (AlexPn _ lineNumber _, _, _) <- alexGetInput
-  alexError $ show lineNumber ++ ": parse error"
+parseError x = do
+   (AlexPn _ l _, _, _) <- alexGetInput
+   alexError $ show l ++ ": unexpected " ++ show x
   
-lexer = (alexMonadScan >>=)
+lexer = (alexMonadScan' >>=)
 }

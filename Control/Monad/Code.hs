@@ -4,7 +4,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Control.Monad.Code
@@ -28,8 +27,8 @@ import Control.Monad.ConstantPool
 import Control.Monad.Fix
 import Control.Monad.Indexed.Class hiding (Monad)
 import qualified Control.Monad.Indexed.Class as Indexed
-import Control.Monad.State.Class (MonadState)
-import qualified Control.Monad.State.Class as State
+import Control.Monad.State.Class
+import Control.Monad.Trans
 import Control.Monad.Version
 
 import Data.Binary.Put
@@ -76,43 +75,42 @@ data PairS a = a :+: S
 
 newtype StateT m a = StateT { runStateT :: S -> m (PairS a) }
 
+instance Functor m => Functor (StateT m) where
+  fmap f m = StateT $ \ s ->
+    fmap (\ ~(a :+: s') -> (f a :+: s')) $ runStateT m s
+
+instance (Functor m, Monad m) => Applicative (StateT m) where
+  pure = return
+  (<*>) = ap
+
 instance Monad m => Monad (StateT m) where
-  return a = StateT $ \s -> s `seq` return (a :+: s)
-  {-# INLINE return #-}
+  return a = StateT $ \ s -> s `seq` return (a :+: s)
   
-  m >>= k = StateT $ \s -> do
+  m >>= k = StateT $ \ s -> do
     ~(a :+: s') <- runStateT m s
     runStateT (k a) s'
-  {-# INLINE (>>=) #-}
 
-  fail str = StateT $ \_ -> fail str
+  fail str = StateT $ \ _ -> fail str
 
 instance MonadFix m => MonadFix (StateT m) where
-  mfix f = StateT $ \s -> s `seq` mfix $ \ ~(a :+: _) -> runStateT (f a) s
+  mfix f = StateT $ \ s -> s `seq` mfix $ \ ~(a :+: _) -> runStateT (f a) s
 
-lift :: Monad m => m a -> StateT m a
-lift m = StateT $ \s -> s `seq` do
-  a <- m
-  return (a :+: s)
-{-# INLINE lift #-}
+instance MonadTrans StateT where
+  lift m = StateT $ \ s -> s `seq` do
+    a <- m
+    return (a :+: s)
 
-get :: Monad m => StateT m S
-get = StateT $ \s -> s `seq` return (s :+: s)
-{-# INLINE get #-}
-
-put :: Monad m => S -> StateT m ()
-put s = s `seq` StateT $ \_ -> return (() :+: s)
-{-# INLINE put #-}
+instance Monad m => MonadState S (StateT m) where
+  get = StateT $ \ s -> s `seq` return (s :+: s)
+  put s = s `seq` StateT $ \ _ -> return (() :+: s)
 
 newtype CodeT s m i j a = CodeT
                           { unCodeT :: StateT m a
-                          } deriving ( Monad
+                          } deriving ( Functor
+                                     , Applicative
+                                     , Monad
                                      , MonadFix
                                      )
-
-instance MonadState s m => MonadState s (CodeT s' m i j) where
-  get = CodeT . lift $ State.get
-  put = CodeT . lift . State.put
 
 instance Monad m => Indexed.Monad (CodeT s m) where
   returnM = CodeT . return
@@ -267,7 +265,7 @@ instance MonadConstantPool m => MonadCode (CodeT s m) where
         putWord8 Opcode.iinc
         putWord16be local
         putWord16be . fromIntegral $ cnst
-    | otherwise = iload local `thenM` \label ->
+    | otherwise = iload local `thenM` \ label ->
                   ldc cnst `thenM_`
                   iadd `thenM_`
                   istore local `thenM_`

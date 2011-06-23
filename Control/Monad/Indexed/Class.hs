@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
 module Control.Monad.Indexed.Class (Monad (..)) where
 
 import Prelude hiding (Monad (..))

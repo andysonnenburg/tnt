@@ -1,12 +1,12 @@
-{-# LANGUAGE ImpredicativeTypes, RankNTypes, RebindableSyntax #-}
+{-# LANGUAGE RankNTypes, RebindableSyntax #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 module Language.Brainfuck.Compiler (compile) where
 
 import Control.Monad hiding (Monad (..))
 import Control.Monad.Code
 import Control.Monad.ConstantPool
-import Control.Monad.Indexed hiding (return)
-import qualified Control.Monad.Indexed as M
+import Control.Monad.Indexed
+import Control.Monad.Indexed.Syntax hiding (return)
 import Control.Monad.Version
 
 import Data.Binary.Put
@@ -26,7 +26,7 @@ compile :: String -> ByteString -> Either String ByteString
 compile className = liftM f . parse
   where
     f x =
-      let x' = (emit' . optimize) x >> M.return ()
+      let x' = (emit' . optimize) x >> returnM ()
           x'' = toClassFile className x'
       in runPut . putClassFile $ x''
 
@@ -34,7 +34,8 @@ toClassFile :: String -> (forall s. Code s () i ()) -> ClassFile
 toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
   classM (mconcat [ public
                   , final
-                  , super]) className (Just "java/lang/Object")
+                  , super
+                  ]) className (Just "java/lang/Object")
     ["java/lang/Runnable"]
     []
     [ execCode
@@ -42,7 +43,7 @@ toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
         aload 0
         invokespecial "java/lang/Object" "<init>" ()V
         return
-        M.return ()
+        returnM ()
     , execCode
       (mconcat [ public
                , static
@@ -53,8 +54,8 @@ toClassFile className x = runVersion 0 49 $ evalConstantPoolT $
         invokespecial className "<init>" ()V
         invokevirtual className "run" ()V
         return
-        M.return ()
-    , execCode (mconcat [public, final]) "run" ()V (x >> M.return ())
+        returnM ()
+    , execCode (mconcat [public, final]) "run" ()V x
     ]
     []
 

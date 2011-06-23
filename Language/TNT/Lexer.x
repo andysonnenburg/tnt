@@ -6,7 +6,15 @@
     -fno-warn-name-shadowing
     -fno-warn-unused-binds
     -fno-warn-unused-matches#-}
-module Language.TNT.Lexer where
+module Language.TNT.Lexer
+       ( Alex
+       , AlexPosn (..)
+       , alexError
+       , alexGetInput
+       , alexMonadScan
+       , alexMonadScan'
+       , runAlex
+       ) where
 
 import Codec.Binary.UTF8.String (decode)
 
@@ -15,6 +23,8 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Word
 
 import Language.TNT.Token
+
+import Prelude hiding (Ordering (..), and, or)
 }
 
 %wrapper "monadUserState-bytestring"
@@ -25,21 +35,40 @@ $alpha = [a-zA-Z]
 @name = $alpha [$alpha $digit \_]*
 
 :-
-  <0> \n { newline }
-  <0> $white ;
+  <0> \n|$white ;
   <0> "//".* ;
   <0> "import" { import' }
+  <0> "as" { as' }
+  <0> "var" { var }
+  <0> "fun" { fun }
+  <0> "if" { if' }
+  <0> "else" { else' }
+  <0> "for" { for }
+  <0> "in" { in' }
+  <0> "return" { return' }
   <0> @name { name }
   <0> \" { beginString `andBegin` string }
   <string> \\ { begin escapedChar }
   <escapedChar> \" { char `andBegin` string }
   <string> \" { endString `andBegin` 0}
   <string> . { char }
-  <0> "=" { equals }
+  <0> "=" { equal }
+  <0> "==" { eq }
+  <0> "!=" { ne }
+  <0> "<" { lt }
+  <0> "<=" { le }
+  <0> ">" { gt }
+  <0> ">=" { ge }
+  <0> "&&" { and }
+  <0> "||" { or }
   <0> "." { dot }
   <0> "," { comma }
   <0> "(" { openParen }
   <0> ")" { closeParen }
+  <0> "{" { openBrace }
+  <0> "}" { closeBrace }
+  <0> "[" { openBracket }
+  <0> "]" { closeBracket }
   <0> ";" { semi }
 
 {
@@ -71,15 +100,48 @@ endString _ _ = do
   return . String . decode . f $ []
 
 import' = token' Import
-equals = token' Equals
+as' = token' As
+var = token' Var
+fun = token' Fun
+if' = token' If
+else' = token' Else
+for = token' For
+in' = token' In
+return' = token' Return
+equal = token' Equal
+eq = token' EQ
+ne = token' NE
+lt = token' LT
+le = token' LE
+gt = token' GT
+ge = token' GE
+and = token' And
+or = token' Or
 dot = token' Dot
 comma = token' Comma
 openParen = token' OpenParen
 closeParen = token' CloseParen
+openBrace = token' OpenBrace
+closeBrace = token' CloseBrace
+openBracket = token' OpenBracket
+closeBracket = token' CloseBracket
 semi = token' Semi
-newline = token' Newline
 
 token' x _ _ = return x
+
+alexMonadScan' :: Alex Token
+alexMonadScan' = do
+  inp <- alexGetInput
+  sc <- alexGetStartCode
+  case alexScan inp sc of
+    AlexEOF -> alexEOF
+    AlexError (AlexPn _ l _, _, _) -> alexError $ show l ++ ": lexical error"
+    AlexSkip inp' len -> do
+      alexSetInput inp'
+      alexMonadScan'
+    AlexToken inp' len action -> do
+      alexSetInput inp'
+      action inp len
 
 alexEOF :: Alex Token
 alexEOF = return EOF

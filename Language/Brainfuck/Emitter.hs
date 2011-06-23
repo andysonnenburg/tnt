@@ -6,8 +6,8 @@ import Control.Monad (forM_)
 import Control.Monad.Fix
 import Control.Monad.Code
 import Control.Monad.ConstantPool
-import Control.Monad.Indexed hiding (return)
-import qualified Control.Monad.Indexed as M
+import Control.Monad.Indexed
+import Control.Monad.Indexed.Syntax hiding (return)
 
 import Data.Int
 
@@ -22,7 +22,7 @@ emit xs = do
   label <- emitHeader
   forM_ xs emitCommand
   emitFooter
-  M.return label
+  returnM label
 
 emitHeader = do
   label <- ldc 30000
@@ -30,7 +30,7 @@ emitHeader = do
   astore 1
   ldc 0
   istore 2
-  M.return label
+  returnM label
 
 emitCommand (IncrementPointer x) = emitIncrementPointer x
 emitCommand (IncrementByte x) = emitIncrementByte x
@@ -49,7 +49,7 @@ emitIncrementByte x = do
   iadd
   i2b
   bastore
-  M.return label
+  returnM label
 
 emitOutputByte = do
   label <- getstatic "java/lang/System" "out" (L"java/io/PrintStream")
@@ -57,7 +57,7 @@ emitOutputByte = do
   iload 2
   baload
   invokevirtual "java/io/PrintStream" "write" (I)V
-  M.return label
+  returnM label
 
 emitInputByte = do
   label <- aload 1
@@ -66,7 +66,7 @@ emitInputByte = do
   invokevirtual "java/io/InputStream" "read" ()I
   i2b
   bastore
-  M.return label
+  returnM label
 
 emitWhileNonzero xs = do
   (start, _) <- mfix (\ ~(_, end) -> do
@@ -77,10 +77,12 @@ emitWhileNonzero xs = do
     forM_ xs emitCommand
     goto start
     end <- nop
-    M.return (start, end))
-  M.return start
+    returnM (start, end))
+  returnM start
 
 emitFooter = do
+  label <- nop
   getstatic "java/lang/System" "out" (L"java/io/PrintStream")
   invokevirtual "java/io/PrintStream" "flush" ()V
   return
+  returnM label

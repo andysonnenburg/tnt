@@ -5,11 +5,30 @@ module Language.TNT.Token
 data Token = Name String
            | String String
            | Import
-           | Equals
+           | As
+           | Var
+           | Fun
+           | If
+           | Else
+           | For
+           | In
+           | Return
+           | Equal
+           | EQ
+           | NE
+           | LT
+           | LE
+           | GT
+           | GE
+           | And
+           | Or
            | Dot
            | Comma
            | OpenParen
            | CloseParen
+           | OpenBrace
+           | CloseBrace
+           | OpenBracket
+           | CloseBracket
            | Semi
-           | Newline
            | EOF deriving Show

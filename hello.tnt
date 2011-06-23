@@ -1,3 +1,29 @@
-import System
+import tnt.lang.print;
 
-println("hello, world")
+var merge = fun (left, right) {
+  var result = [];
+  while (left.length > zero || right.length > zero) {
+  }
+  return result;
+};
+
+var sort = fun (m) {
+  if (m.length <= 1) {
+    return m;
+  }
+  var left = [], right = [];
+  var middle = m.length / 2;
+  for (var i = 0; i < middle; ++i) {
+    left.add(m[i]);
+  }
+  for (var i = 0; i < middle; ++i) {
+    right.add(m[i]);
+  }
+  left = sort(left);
+  right = sort(right);
+
+  var result = merge(left, right);
+  return result;
+};
+
+print(sort(xs));

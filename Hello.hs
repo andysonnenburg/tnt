@@ -4,8 +4,9 @@ module Main (main) where
 
 import Control.Monad.Code
 import Control.Monad.ConstantPool
-import Control.Monad.Indexed hiding (return)
-import qualified Control.Monad.Indexed as M
+import Control.Monad.Function hiding (returnM)
+import Control.Monad.Indexed (returnM)
+import Control.Monad.Indexed.Syntax hiding (return)
 import Control.Monad.Version
 
 import Data.Binary.Put
@@ -21,7 +22,7 @@ import qualified Prelude
 
 main :: IO ()
 main =
-  hSetBinaryMode stdout True Prelude.>>
+  hSetBinaryMode stdout True `thenM_`
   (BL.putStr .
    runPut .
    putClassFile .
@@ -38,6 +39,6 @@ main =
           ldc "hello, world"
           invokevirtual "java/io/PrintStream" "println" (L"java/lang/String")V
           return
-          M.return ()
+          returnM ()
       ]
       []
