@@ -1,4 +1,4 @@
-import tnt.lang.print;
+import tnt.lang.print as print;
 
 var merge = fun (left, right) {
   var result = [];

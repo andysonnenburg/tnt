@@ -17,12 +17,17 @@ import Data.ClassFile
 import Data.ClassFile.Access
 import Data.Monoid
 
+import Language.TNT.Lexer
+import Language.TNT.Message
 import Language.TNT.Parser
+import Language.TNT.Resolver
+import Language.TNT.Stmt
+import Language.TNT.Var
 
-import Prelude hiding (Monad (..))
+import Prelude hiding (Monad (..), lex)
 
-compile :: String -> ByteString -> Either String ByteString
-compile className = liftM (pack . show) . parse
+compile :: String -> String -> Either Message [Stmt Var]
+compile className = parse >>= resolve
   -- where
   --   f = runPut .
   --       putClassFile .

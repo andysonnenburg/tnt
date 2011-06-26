@@ -3,26 +3,20 @@ module Language.TNT.Token
        ) where
 
 data Token = Name String
+           | Operator String
            | String String
+           | Char Char
            | Import
            | As
            | Var
            | Fun
            | If
+           | Elif
            | Else
            | For
            | In
            | Return
-           | Equal
-           | EQ
-           | NE
-           | LT
-           | LE
-           | GT
-           | GE
-           | And
-           | Or
-           | Dot
+           | Period
            | Comma
            | OpenParen
            | CloseParen
@@ -30,5 +24,6 @@ data Token = Name String
            | CloseBrace
            | OpenBracket
            | CloseBracket
+           | Equal
            | Semi
            | EOF deriving Show

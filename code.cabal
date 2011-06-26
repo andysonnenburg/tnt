@@ -40,7 +40,7 @@ library
   ghc-options: -Wall -O3
   build-depends: base >= 4
                , binary
-               , monads-fd
+               , mtl
                , containers
                , bytestring
                , data-binary-ieee754

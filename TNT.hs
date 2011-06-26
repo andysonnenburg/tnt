@@ -24,13 +24,14 @@ main :: IO ()
 main = do
   TNT {..} <- cmdArgsRun tnt
   forM_ files $ \inputFile -> do
-    let outputFile = replaceExtension inputFile ".class"
-        className = dropExtension inputFile
+    -- let outputFile = replaceExtension inputFile ".class"
+    let className = dropExtension inputFile
     withFile inputFile ReadMode $
-      BL.hGetContents >=>
+      hGetContents >=>
       either
-      (hPutStrLn stderr)
-      (withFile outputFile WriteMode . flip hPutBinary) .
+      (hPutStrLn stderr . show)
+      print .
+      -- (withFile outputFile WriteMode . flip hPutStrLn) .
       compile className
   where
     hPutBinary h s = hSetBinaryMode h True *>
