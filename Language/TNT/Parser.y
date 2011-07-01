@@ -17,7 +17,7 @@ import Language.TNT.Message
 import Language.TNT.Stmt as Stmt
 import Language.TNT.Token as Token
 
-import Prelude hiding (foldr1, reverse)
+import Prelude hiding (Ordering (..), foldr1, reverse)
 }
 
 %tokentype { Located Token }
@@ -32,8 +32,11 @@ import Prelude hiding (foldr1, reverse)
   FOR { Locate _ Token.For }
   IN { Locate _ In }
   RETURN { Locate _ Token.Return }
+  THROW { Locate _ Token.Throw }
   STRING { Locate _ (Token.String _) }
   NAME { Locate _ (Name _) }
+  '<' { Locate _ LT }
+  '!' { Locate _ Not }
   '.' { Locate _ Period }
   ',' { Locate _ Comma }
   '(' { Locate _ OpenParen }
@@ -43,7 +46,14 @@ import Prelude hiding (foldr1, reverse)
   '[' { Locate _ OpenBracket }
   ']' { Locate _ CloseBracket }
   '=' { Locate _ Equal }
+  ':' { Locate _ Colon }
   ';' { Locate _ Semi }
+
+%right THROW
+%left '='
+%nonassoc '<'
+%left '.'
+%left '(' ')'
 
 %name parser
 
@@ -100,10 +110,12 @@ some_reversed_names :: { NonEmpty (Located String) }
 stmt :: { Located (Stmt Located String) }
   : import ';' { $1 <. $2 }
   | decl ';' { $1 <. $2 }
+  | fun_decl { $1 }
   | if { $1 }
   | for { $1 }
-  | forEach { $1 }
+  | for_each { $1 }
   | return ';' { $1 <. $2 }
+  | throw ';' { $1 <. $2 }
   | expr ';' { Expr <%> $1 <. $2}
 
 import :: { Located (Stmt Located String) }
@@ -119,7 +131,9 @@ decl :: { Located (Stmt Located String) }
   : VAR NAME '=' expr {
       decl $1 $2 $4
     }
-  | FUN NAME parameters block {
+
+fun_decl :: { Located (Stmt Located String) }
+  : FUN NAME parameters block {
       decl $1 $2 (fun $1 $3 $4)
     }
 
@@ -148,7 +162,7 @@ for :: { Located (Stmt Located String) }
       <.> duplicate $9
     }
 
-forEach :: { Located (Stmt Located String) }
+for_each :: { Located (Stmt Located String) }
   : FOR '(' VAR NAME IN expr ')' block {
       ForEach
       <$ $1
@@ -158,8 +172,20 @@ forEach :: { Located (Stmt Located String) }
     }
 
 return :: { Located (Stmt Located String) }
-  : RETURN expr {
+  : RETURN {
       Stmt.Return
+      <$ $1
+      <.> duplicate (Null <$ $1)
+    }
+  | RETURN expr {
+      Stmt.Return
+      <$ $1
+      <.> duplicate $2
+    }
+
+throw :: { Located (Stmt Located String) }
+  : THROW expr {
+      Stmt.Throw
       <$ $1
       <.> duplicate $2
     }
@@ -185,7 +211,17 @@ expr :: { Located (Expr Located String) }
   | mutate { $1 }
   | assign { $1 }
   | app { $1 }
+  | object { $1 }
   | list { $1 }
+  | expr '<' expr {
+      app (access $1 ("lt" <$ $2)) ((:[]) <%> duplicate $3)
+    }
+  | '!' expr {
+      app (access $2 ("not" <$ $1)) ([] <$ $1)
+    }
+  | '(' expr ')' {
+      $1 .> $2 <. $3
+    }
 
 string :: { Located (Expr Located String) }
   : STRING {
@@ -217,9 +253,7 @@ parameters :: { Located [Located String] }
 
 access :: { Located (Expr Located String) }
   : expr '.' NAME {
-      Access
-      <%> duplicate $1
-      <.> duplicate (getName <%> $3)
+      access $1 (getName <%> $3)
     }
 
 mutate :: { Located (Expr Located String) }
@@ -239,9 +273,7 @@ assign :: { Located (Expr Located String) }
 
 app :: { Located (Expr Located String) }
   : expr arguments {
-      App
-      <%> duplicate $1
-      <.> duplicate $2
+      app $1 $2
     }
 
 arguments :: { Located [Located (Expr Located String)] }
@@ -255,6 +287,40 @@ arguments :: { Located [Located (Expr Located String)] }
       <$ $1
       <.> $2
       <. $3
+    }
+
+object :: { Located (Expr Located String) }
+  : '{' '}' {
+      Object []
+      <$ $1
+      <. $2
+    }
+  | '{' some_props '}' {
+      Object
+      <$ $1
+      <.> (toList <%> $2)
+      <. $3
+    }
+
+some_props :: { Located (NonEmpty (Located (Property Located String))) }
+  : some_reversed_props {
+      let props = reverse $1
+      in props <$ sequenceA props
+    }
+
+some_reversed_props :: { NonEmpty (Located (Property Located String)) }
+  : prop {
+      $1 :| []
+    }
+  | some_reversed_props ',' prop {
+      $3 <| $1
+    }
+
+prop :: { Located (Property Located String) }
+  : NAME ':' expr {
+      (,)
+      <%> duplicate (getName <%> $1)
+      <.> duplicate $3
     }
 
 list :: { Located (Expr Located String) }
@@ -313,6 +379,28 @@ decl var name expr =
   <$ var
   <.> duplicate (getName <$> name)
   <.> duplicate expr
+
+app :: ( Extend f
+       , Apply f
+       ) =>
+       f (Expr f String) ->
+       f [f (Expr f String)] ->
+       f (Expr f String)
+app x y =
+  App
+  <%> duplicate x
+  <.> duplicate y
+
+access :: ( Extend f
+          , Apply f
+          ) =>
+          f (Expr f String) ->
+          f String ->
+          f (Expr f String)
+access x y =
+  Access
+  <$> duplicate x
+  <.> duplicate y
 
 fun :: ( Extend f
        , Apply f

@@ -27,7 +27,7 @@ import Language.TNT.Location
 import Language.TNT.Message
 import Language.TNT.Token
 
-import Prelude hiding (getChar, last, lex)
+import Prelude hiding (Ordering (..), getChar, last, lex)
 }
 
 @name = [a-zA-Z_] [a-zA-Z_0-9]*
@@ -39,16 +39,22 @@ $white+ ;
 "//".* ;
 
 <0> {
+  \< { special LT }
+  \<\= { special LE }
+  \> { special GT }
+  \! { special Not }
+  \|\| { special Or }
   \( { special OpenParen }
   \) { special CloseParen }
   \[ { special OpenBracket }
   \] { special CloseBracket }
   \, { special Comma }
-  \; { special Semi }
   \{ { special OpenBrace }
   \} { special CloseBrace }
   \. { special Period }
   \= { special Equal }
+  \: { special Colon }
+  \; { special Semi }
   "import" { special Import }
   "as" { special As }
   "var" { special Var }

@@ -16,6 +16,13 @@ data Token = Name String
            | For
            | In
            | Return
+           | Throw
+           | LT
+           | LE
+           | GT
+           | GE
+           | Not
+           | Or
            | Period
            | Comma
            | OpenParen
@@ -25,5 +32,6 @@ data Token = Name String
            | OpenBracket
            | CloseBracket
            | Equal
+           | Colon
            | Semi
            | EOF deriving Show
