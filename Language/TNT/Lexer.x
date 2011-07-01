@@ -44,6 +44,7 @@ $white+ ;
   \> { special GT }
   \! { special Not }
   \|\| { special Or }
+  \+ { special Plus }
   \( { special OpenParen }
   \) { special CloseParen }
   \[ { special OpenBracket }
@@ -65,6 +66,7 @@ $white+ ;
   "for" { special For }
   "in" { special In }
   "return" { special Return }
+  "throw" { special Throw }
   @name { name }
   \' { char }
   \" { string }

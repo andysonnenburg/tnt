@@ -37,6 +37,7 @@ import Prelude hiding (Ordering (..), foldr1, reverse)
   NAME { Locate _ (Name _) }
   '<' { Locate _ LT }
   '!' { Locate _ Not }
+  '+' { Locate _ Plus }
   '.' { Locate _ Period }
   ',' { Locate _ Comma }
   '(' { Locate _ OpenParen }
@@ -49,11 +50,10 @@ import Prelude hiding (Ordering (..), foldr1, reverse)
   ':' { Locate _ Colon }
   ';' { Locate _ Semi }
 
-%right THROW
 %left '='
 %nonassoc '<'
+%left '+'
 %left '.'
-%left '(' ')'
 
 %name parser
 
@@ -218,6 +218,9 @@ expr :: { Located (Expr Located String) }
     }
   | '!' expr {
       app (access $2 ("not" <$ $1)) ([] <$ $1)
+    }
+  | expr '+' expr {
+      app (access $1 ("plus" <$ $2)) ((:[]) <%> duplicate $3)
     }
   | '(' expr ')' {
       $1 .> $2 <. $3

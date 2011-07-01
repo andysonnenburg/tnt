@@ -23,6 +23,7 @@ data Token = Name String
            | GE
            | Not
            | Or
+           | Plus
            | Period
            | Comma
            | OpenParen
