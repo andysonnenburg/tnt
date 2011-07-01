@@ -296,10 +296,10 @@ getString :: Token -> String
 getString (Token.String x) = x
 
 sequenceA :: Apply f => NonEmpty (f a) -> f (NonEmpty a)
-sequenceA ~(x :| xs) =
-  case xs of
-    [] -> (:| []) <$> x
-    (y:ys) -> (<|) <$> x <.> sequenceA (y :| ys)
+sequenceA ~(x :| xs) = go x xs
+  where
+    go y [] = (:| []) <$> y
+    go y (z:zs) = (<|) <$> y <.> go z zs
 
 decl :: ( Extend f
         , Apply f
