@@ -22,6 +22,9 @@ data Stmt w a = Import (w String) (w a)
                 (w a)
                 (w (Expr w a))
                 (w [w (Stmt w a)])
+              | While
+                (w (Expr w a))
+                (w [w (Stmt w a)])
               | Return (w (Expr w a))
               | Throw (w (Expr w a))
               | Expr (Expr w a)
@@ -32,8 +35,9 @@ data Expr w a = Var a
               | Fun
                 (w [w a])
                 (w [w (Stmt w a)])
-              | Numeric Double
+              | Number Double
               | String String
+              | Char Char
               | Object [w (Property w a)]
               | List [w (Expr w a)]
               | Null
@@ -48,3 +52,9 @@ data Expr w a = Var a
               | App
                 (w (Expr w a))
                 (w [w (Expr w a)])
+              | Or
+                (w (Expr w a))
+                (w (Expr w a))
+              | And
+                (w (Expr w a))
+                (w (Expr w a))

@@ -17,7 +17,7 @@ import Language.TNT.Message
 import Language.TNT.Stmt as Stmt
 import Language.TNT.Token as Token
 
-import Prelude hiding (Ordering (..), foldr1, reverse)
+import Prelude hiding (Ordering (..), foldr1, getChar, reverse)
 }
 
 %tokentype { Located Token }
@@ -31,22 +31,31 @@ import Prelude hiding (Ordering (..), foldr1, reverse)
   ELSE { Locate _ Else }
   FOR { Locate _ Token.For }
   IN { Locate _ In }
+  WHILE { Locate _ Token.While }
   RETURN { Locate _ Token.Return }
   THROW { Locate _ Token.Throw }
+  NUMBER { Locate _ (Token.Number _) }
   STRING { Locate _ (Token.String _) }
+  CHAR { Locate _ (Token.Char _) }
   NAME { Locate _ (Name _) }
-  '<' { Locate _ LT }
-  '!' { Locate _ Not }
-  '+' { Locate _ Plus }
-  '.' { Locate _ Period }
   ',' { Locate _ Comma }
+  '=' { Locate _ Equal }
+  "||" { Locate _ Token.Or }
+  "&&" { Locate _ Token.And }
+  '<' { Locate _ LT }
+  "<=" { Locate _ LE }
+  '>' { Locate _ GT }
+  ">=" { Locate _ GE }
+  '+' { Locate _ Plus }
+  '-' { Locate _ Minus }
+  '!' { Locate _ Not }
+  '.' { Locate _ Period }
   '(' { Locate _ OpenParen }
   ')' { Locate _ CloseParen }
   '{' { Locate _ OpenBrace }
   '}' { Locate _ CloseBrace }
   '[' { Locate _ OpenBracket }
   ']' { Locate _ CloseBracket }
-  '=' { Locate _ Equal }
   ':' { Locate _ Colon }
   ';' { Locate _ Semi }
 
@@ -119,6 +128,7 @@ stmt :: { Located (Stmt Located String) }
   | if { $1 }
   | for { $1 }
   | for_each { $1 }
+  | while { $1 }
   | return ';' { $1 <. $2 }
   | throw ';' { $1 <. $2 }
   | expr ';' { Expr <%> $1 <. $2}
@@ -176,6 +186,14 @@ for_each :: { Located (Stmt Located String) }
       <.> duplicate $8
     }
 
+while :: { Located (Stmt Located String) }
+  : WHILE '(' expr ')' block {
+      Stmt.While
+      <$ $1
+      <.> duplicate $3
+      <.> duplicate $5
+    }
+
 return :: { Located (Stmt Located String) }
   : RETURN {
       Stmt.Return
@@ -211,29 +229,63 @@ block :: { Located [Located (Stmt Located String)] }
 expr :: { Located (Expr Located String) }
   : var { $1 }
   | fun { $1 }
+  | number { $1 }
   | string { $1 }
+  | char { $1 }
   | access { $1 }
   | mutate { $1 }
   | assign { $1 }
   | app { $1 }
   | object { $1 }
   | list { $1 }
+  | expr "||" expr {
+      Stmt.Or
+      <%> duplicate $1
+      <.> duplicate $3
+    }
+  | expr "&&" expr {
+      Stmt.And
+      <%> duplicate $1
+      <.> duplicate $3
+    }
   | expr '<' expr {
       app (access $1 ("lt" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | '!' expr {
-      app (access $2 ("not" <$ $1)) ([] <$ $1)
+  | expr "<=" expr {
+      app (access $1 ("le" <$ $2)) ((:[]) <%> duplicate $3)
+    }
+  | expr '>' expr {
+      app (access $1 ("gt" <$ $2)) ((:[]) <%> duplicate $3)
+    }
+  | expr ">=" expr {
+      app (access $1 ("ge" <$ $2)) ((:[]) <%> duplicate $3)
     }
   | expr '+' expr {
       app (access $1 ("plus" <$ $2)) ((:[]) <%> duplicate $3)
+    }
+  | expr '-' expr {
+      app (access $1 ("minus" <$ $2)) ((:[]) <%> duplicate $3)
+    }
+  | '!' expr {
+      app (access $2 ("not" <$ $1)) ([] <$ $1)
     }
   | '(' expr ')' {
       $1 .> $2 <. $3
     }
 
+number :: { Located (Expr Located String) }
+  : NUMBER {
+      Stmt.Number . getNumber <%> $1
+    }
+
 string :: { Located (Expr Located String) }
   : STRING {
       Stmt.String . getString <%> $1
+    }
+
+char :: { Located (Expr Located String) }
+  : CHAR {
+      Stmt.Char . getChar <%> $1
     }
 
 var :: { Located (Expr Located String) }
@@ -366,8 +418,14 @@ lexer' = (lexer >>=)
 getName :: Token -> String
 getName (Name x) = x
 
+getNumber :: Token -> Double
+getNumber (Token.Number x) = x
+
 getString :: Token -> String
 getString (Token.String x) = x
+
+getChar :: Token -> Char
+getChar (Token.Char x) = x
 
 sequenceA :: Apply f => NonEmpty (f a) -> f (NonEmpty a)
 sequenceA ~(x :| xs) = go x xs

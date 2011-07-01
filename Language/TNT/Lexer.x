@@ -31,6 +31,7 @@ import Prelude hiding (Ordering (..), getChar, last, lex)
 }
 
 @name = [a-zA-Z_] [a-zA-Z_0-9]*
+@digit = [0-9]
 
 tnt :-
 
@@ -40,11 +41,14 @@ $white+ ;
 
 <0> {
   \< { special LT }
-  \<\= { special LE }
+  "<=" { special LE }
   \> { special GT }
-  \! { special Not }
-  \|\| { special Or }
+  ">=" { special GE }
+  "||" { special Or }
+  "&&" { special And }
   \+ { special Plus }
+  \- { special Minus }
+  \! { special Not }
   \( { special OpenParen }
   \) { special CloseParen }
   \[ { special OpenBracket }
@@ -65,9 +69,11 @@ $white+ ;
   "else" { special Else }
   "for" { special For }
   "in" { special In }
+  "while" { special While }
   "return" { special Return }
   "throw" { special Throw }
   @name { name }
+  @digit { integral }
   \' { char }
   \" { string }
 }
@@ -118,6 +124,10 @@ string' s = do
       c' <- getEscapedChar
       string' (c':s)
     _ -> string' (c:s)
+
+integral :: Action
+integral l _ _ = do
+  return $ Locate l (Number 0)
 
 getChar :: P Char
 getChar = do
@@ -241,7 +251,6 @@ lex' = do
     _ -> do
       xs <- lex'
       return (x:xs)
-    
 
 data AlexInput = AI Point String
 

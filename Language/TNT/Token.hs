@@ -4,6 +4,7 @@ module Language.TNT.Token
 
 data Token = Name String
            | Operator String
+           | Number Double
            | String String
            | Char Char
            | Import
@@ -15,15 +16,18 @@ data Token = Name String
            | Else
            | For
            | In
+           | While
            | Return
            | Throw
+           | Or
+           | And
            | LT
            | LE
            | GT
            | GE
-           | Not
-           | Or
            | Plus
+           | Minus
+           | Not
            | Period
            | Comma
            | OpenParen
