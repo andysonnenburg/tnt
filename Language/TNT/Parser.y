@@ -50,10 +50,15 @@ import Prelude hiding (Ordering (..), foldr1, reverse)
   ':' { Locate _ Colon }
   ';' { Locate _ Semi }
 
-%left '='
-%nonassoc '<'
-%left '+'
-%left '.'
+%left ','
+%right '='
+%left "||"
+%left "&&"
+%left '<' "<=" '>' ">="
+%left '+' '-'
+%left '*' '/' '%'
+%right '!'
+%left '(' ')' '[' ']' '.'
 
 %name parser
 
