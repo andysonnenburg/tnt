@@ -3,10 +3,8 @@
 module Language.TNT.Compiler (compile) where
 
 import Control.Applicative
-import Control.Monad hiding (Monad (..))
 import Control.Monad.Code
 import Control.Monad.ConstantPool
-import Control.Monad.Indexed.Syntax hiding (return)
 import Control.Monad.State hiding (Monad (..))
 import Control.Monad.Version
 
@@ -18,16 +16,19 @@ import Data.ClassFile.Access
 import Data.Monoid
 
 import Language.TNT.Lexer
+import Language.TNT.Location
 import Language.TNT.Message
+import Language.TNT.Name
 import Language.TNT.Parser
-import Language.TNT.Resolver
 import Language.TNT.Stmt
 import Language.TNT.Var
 
-import Prelude hiding (Monad (..), lex)
+import Prelude
 
-compile :: String -> String -> Either Message [Stmt Var]
-compile className = parse >>= resolve
+compile :: String ->
+           String ->
+           Either Message (Located [Located (Stmt Located String)])
+compile className = parse
   -- where
   --   f = runPut .
   --       putClassFile .

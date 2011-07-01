@@ -4,22 +4,29 @@ module Language.TNT.Location
        , Located (..)
        ) where
 
-import Data.Monoid
+import Control.Comonad
 
-data Point = Point Int Int deriving Show
+import Data.Functor.Apply
+import Data.Semigroup
+
+data Point = Point Int Int deriving (Show, Eq, Ord)
 
 data Location = Location Point Point deriving Show
 
-data Located a = Located Location a deriving Show
+data Located a = Locate Location a deriving Show
 
-instance Monoid Location where
-  mempty = Location (Point 0 0) (Point 0 0)
-  mappend
-    (Location (Point x1 y1) (Point x2 y2))
-    (Location (Point x3 y3) (Point x4 y4)) =
-      Location (Point x1' y1') (Point x2' y2')
-    where
-      (y1', x1') = min (y1, x1) (y3, x3)
-      (y2', x2') = max (y2, x2) (y4, x4)
+instance Semigroup Location where
+  Location a b <> Location c d = Location (min a c) (max b d)
     
-    
+instance Functor Located where
+  fmap f (Locate x a) = Locate x (f a)
+
+instance Extend Located where
+  duplicate w@(Locate x _) = Locate x w
+  extend f w@(Locate x _) = Locate x (f w)
+
+instance Comonad Located where
+  extract (Locate _ a) = a
+
+instance Apply Located where
+  Locate x f <.> Locate y a = Locate (x <> y) (f a)

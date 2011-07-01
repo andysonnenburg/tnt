@@ -1,33 +1,18 @@
--- The package version. See the Haskell package versioning policy
--- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
--- standards guiding when and how versions should be incremented.
-Version:             0.1
+version: 0.1
 
--- A short (one-line) description of the package.
 -- Synopsis:            
 
--- A longer description of the package.
 -- Description:         
 
--- The license under which the package is released.
-License:             BSD3
+license: BSD3
+license-file: LICENSE
+author: Andy Sonnenburg
+maintainer: andy.sonnenburg@gmail.com
 
--- The file containing the license text.
-License-file:        LICENSE
-
--- The package author(s).
-Author:              Andy Sonnenburg
-
--- An email address to which users can send suggestions, bug reports,
--- and patches.
-Maintainer:          andy.sonnenburg@gmail.com
-
--- A copyright notice.
 -- Copyright:           
 
-Category:            Language
-
-Build-type:          Simple
+category: Language
+build-type: Simple
 
 -- Extra files to be distributed with the package, such as examples or
 -- a README.
@@ -66,7 +51,6 @@ library
 
 executable hello
   main-is: Hello.hs
-  build-depends: base >= 4
   ghc-options: -Wall -O3
 
 executable bf
@@ -82,6 +66,9 @@ executable bf
 executable tnt
   main-is: TNT.hs
   build-depends: utf8-string
+               , semigroups
+               , semigroupoids
+               , comonad
   other-modules: Language.TNT.Lexer, Language.TNT.Parser
   build-tools: alex, happy
   ghc-options: -Wall -O3

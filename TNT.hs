@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable, RecordWildCards #-}
+{-# LANGUAGE DeriveDataTypeable, FlexibleInstances, RecordWildCards, StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-cse #-}
 module Main (main) where
 
@@ -10,12 +10,17 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as BL
 
 import Language.TNT.Compiler
+import Language.TNT.Location
+import Language.TNT.Stmt
 
 import System.Console.CmdArgs
 import System.FilePath
 import System.IO
 
 data TNT = TNT { files :: [FilePath] } deriving (Show, Data, Typeable)
+
+deriving instance Show a => Show (Stmt Located a)
+deriving instance Show a => Show (Expr Located a)
 
 tnt :: Mode (CmdArgs TNT)
 tnt = cmdArgsMode TNT { files = def &= args &= typFile }

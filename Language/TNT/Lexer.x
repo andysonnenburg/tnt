@@ -21,19 +21,20 @@ import Control.Monad.Writer
 
 import Data.Bits
 import Data.Char
+import Data.Semigroup
 
 import Language.TNT.Location
 import Language.TNT.Message
 import Language.TNT.Token
 
-import Prelude hiding (getChar, lex)
+import Prelude hiding (getChar, last, lex)
 }
 
 @name = [a-zA-Z_] [a-zA-Z_0-9]*
 
 tnt :-
 
-\n|$white+ ;
+$white+ ;
 
 "//".* ;
 
@@ -68,34 +69,37 @@ tnt :-
 type Action = Location -> String -> Int -> P (Located Token)
 
 special :: Token -> Action
-special token l _ _ = return (Located l token)
+special token l _ _ = return (Locate l token)
 
 name :: Action
-name l s n = return . Located l . Name . take n $ s
+name l s n = return . Locate l . Name . take n $ s
 
 char :: Action
 char first _ _ = do
   c <- getChar
   case c of
-    '\'' -> fail "lexical error"
+    '\'' -> do
+      last <- getPoint
+      let l = first <> Location last last
+      throwError $ Message l  "lexical error"
     '\\' -> do
       c' <- getEscapedChar
       '\'' <- getChar
-      end <- getPoint
-      let l = first <> Location end end
-      return $ Located l (Char c')
+      last <- getPoint
+      let l = first <> Location last last
+      return $ Locate l (Char c')
     _ -> do
       '\'' <- getChar
-      end <- getPoint
-      let l = first <> Location end end
-      return $ Located l (Char c)
+      last <- getPoint
+      let l = first <> Location last last
+      return $ Locate l (Char c)
 
 string :: Action
 string first _ _ = do
   s <- string' ""
-  end <- getPoint
-  let l = first <> Location end end
-  return $ Located l s
+  last <- getPoint
+  let l = first <> Location last last
+  return $ Locate l s
 
 string' :: String -> P Token
 string' s = do
@@ -118,10 +122,14 @@ getChar = do
 
 getEscapedChar :: P Char
 getEscapedChar = do
+  first <- getPoint
   c <- getChar
   case c of
     'n' -> return '\n'
-    _ -> fail "lexical error"
+    _ -> do
+      last <- getPoint
+      let l = Location first last
+      throwError $ Message l "lexical error"
 
 getInput :: P AlexInput
 getInput = P $ do
@@ -155,9 +163,6 @@ newtype ErrorT e m a = ErrorT
 
 instance Functor m => Functor (ErrorT e m) where
   fmap f = ErrorT . fmap (fmap f) . unErrorT
-  
-instance Applicative m => Applicative (ErrorT e m) where
-  pure = ErrorT . pure . pure
 
 instance Monad m => Monad (ErrorT e m) where
   return = ErrorT . return . return
@@ -193,7 +198,7 @@ instance Monad P where
 runP :: P a -> String -> Either Message a
 runP (P m) buffer = runIdentity m''
   where
-    s = S { point = Point 0 0
+    s = S { point = Point 1 0
           , buffer
           , startCode = 0
           }
@@ -205,7 +210,7 @@ lexer = do
   i@(AI p b) <- getInput
   sc <- getStartCode
   case alexScan i sc of
-    AlexEOF -> return $ Located (Location p p) EOF
+    AlexEOF -> return $ Locate (Location p p) EOF
     AlexError (AI p' _) -> 
       throwError $ Message (Location p p') "lexical error"
     AlexSkip i' _ -> do
@@ -223,7 +228,7 @@ lex' :: P [Located Token]
 lex' = do
   x <- lexer
   case x of
-    Located _ EOF ->
+    Locate _ EOF ->
       return []
     _ -> do
       xs <- lex'
@@ -241,11 +246,9 @@ alexInputPrevChar :: AlexInput -> Char
 alexInputPrevChar = undefined
 
 movePoint :: Point -> Char -> Point
-movePoint (Point x y) c = case c of
-  '\n' -> Point 1 (y + 1)
-  '\t' -> Point (((((x - 1) `shiftR` 3) + 1) `shiftL` 3) + 1) y
-  _ -> Point (x + 1) y
-
-(<>) :: Monoid m => m -> m -> m
-(<>) = mappend
+movePoint (Point y x) c =
+  case c of
+    '\n' -> Point (y + 1) 0
+    '\t' -> Point y (((((x - 1) `shiftR` 3) + 1) `shiftL` 3) + 1)
+    _ -> Point y (x + 1)
 }
