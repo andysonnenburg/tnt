@@ -187,22 +187,22 @@ expr :: { Located (Expr Located String) }
   | app { $1 }
   | list { $1 }
 
-string
+string :: { Located (Expr Located String) }
   : STRING {
       Stmt.String . getString <%> $1
     }
 
-var
+var :: { Located (Expr Located String) }
   : NAME {
       Stmt.Var . getName <%> $1
     }
 
-fun
+fun :: { Located (Expr Located String) }
   : FUN parameters block {
       fun $1 $2 $3
     }
 
-parameters
+parameters :: { Located [Located String] }
   : '(' ')' {
       []
       <$ $1
@@ -215,14 +215,14 @@ parameters
       <. $3
     }
 
-access
+access :: { Located (Expr Located String) }
   : expr '.' NAME {
       Access
       <%> duplicate $1
       <.> duplicate (getName <%> $3)
     }
 
-mutate
+mutate :: { Located (Expr Located String) }
   : expr '.' NAME '=' expr {
       Mutate
       <%> duplicate $1
@@ -230,21 +230,21 @@ mutate
       <.> duplicate $5
     }
 
-assign
+assign :: { Located (Expr Located String) }
   : NAME '=' expr {
       Assign
       <%> duplicate (getName <%> $1)
       <.> duplicate $3
     }
 
-app
+app :: { Located (Expr Located String) }
   : expr arguments {
       App
       <%> duplicate $1
       <.> duplicate $2
     }
 
-arguments
+arguments :: { Located [Located (Expr Located String)] }
   : '(' ')' {
       []
       <$ $1
@@ -257,7 +257,7 @@ arguments
       <. $3
     }
 
-list
+list :: { Located (Expr Located String) }
   : '[' ']' {
       List []
       <$ $1
@@ -270,7 +270,7 @@ list
       <. $3
     }
 
-qualified_name
+qualified_name :: { Located (String -> String) }
   : NAME {
       showString . getName <%> $1
     }
@@ -284,8 +284,9 @@ qualified_name
 parse :: String -> Either Message (Located [Located (Stmt Located String)])
 parse = runP ((toList <$>) <$> parser)
   
+parseError :: Located Token -> P a
 parseError (Locate x a) = throwError $ Message x ("parse error: " ++ show a)
-  
+
 lexer' = (lexer >>=)
 
 getName :: Token -> String
@@ -327,5 +328,7 @@ fun fun' parameters block =
   <.> duplicate block
 
 infixl 4 <%>
+
+(<%>) :: Functor f => (a -> b) -> f a -> f b
 (<%>) = (<$>)
 }
