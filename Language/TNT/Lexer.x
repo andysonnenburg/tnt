@@ -48,6 +48,9 @@ $white+ ;
   "&&" { special And }
   \+ { special Plus }
   \- { special Minus }
+  \* { special Multiply }
+  \/ { special Div }
+  \% { special Mod }
   \! { special Not }
   \( { special OpenParen }
   \) { special CloseParen }

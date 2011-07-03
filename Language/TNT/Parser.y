@@ -18,6 +18,7 @@ import Language.TNT.Stmt as Stmt
 import Language.TNT.Token as Token
 
 import Prelude hiding (Ordering (..), foldr1, getChar, reverse)
+import qualified Prelude
 }
 
 %tokentype { Located Token }
@@ -48,6 +49,9 @@ import Prelude hiding (Ordering (..), foldr1, getChar, reverse)
   ">=" { Locate _ GE }
   '+' { Locate _ Plus }
   '-' { Locate _ Minus }
+  '*' { Locate _ Multiply }
+  '/' { Locate _ Div }
+  '%' { Locate _ Mod }
   '!' { Locate _ Not }
   '.' { Locate _ Period }
   '(' { Locate _ OpenParen }
@@ -63,6 +67,7 @@ import Prelude hiding (Ordering (..), foldr1, getChar, reverse)
 %right '='
 %left "||"
 %left "&&"
+%left "==" "!="
 %left '<' "<=" '>' ">="
 %left '+' '-'
 %left '*' '/' '%'
@@ -80,32 +85,10 @@ import Prelude hiding (Ordering (..), foldr1, getChar, reverse)
 %%
 
 some_stmts :: { Located (NonEmpty (Located (Stmt Located String))) }
-  : some_reversed_stmts {
-      let stmts = reverse $1
-      in stmts <$ sequenceA stmts
-    }
-
-some_reversed_stmts :: { NonEmpty (Located (Stmt Located String)) }
-  : stmt {
-      $1 :| []
-    }
-  | some_reversed_stmts stmt {
-      $2 <| $1
-    }
+  : some(stmt) { $1 }
 
 some_exprs :: { Located (NonEmpty (Located (Expr Located String))) } 
-  : some_reversed_exprs {
-      let exprs = reverse $1
-      in exprs <$ sequenceA exprs
-    }
-
-some_reversed_exprs :: { NonEmpty (Located (Expr Located String)) } 
-  : expr {
-      $1 :| []
-    }
-  | some_reversed_exprs ',' expr {
-      $3 <| $1
-    }
+  : sepBy1(expr, ',') { $1 }
 
 some_names :: { Located (NonEmpty (Located String)) }
   : some_reversed_names {
@@ -132,6 +115,7 @@ stmt :: { Located (Stmt Located String) }
   | return ';' { $1 <. $2 }
   | throw ';' { $1 <. $2 }
   | expr ';' { Expr <%> $1 <. $2}
+  | non_empty_block { Block <%> $1 }
 
 import :: { Located (Stmt Located String) }
   : IMPORT qualified_name AS NAME {
@@ -213,18 +197,21 @@ throw :: { Located (Stmt Located String) }
       <.> duplicate $2
     }
 
+non_empty_block :: { Located [Located (Stmt Located String)] }
+  : '{' some_stmts '}' {
+      toList
+      <$ $1
+      <.> $2
+      <. $3
+    }
+
 block :: { Located [Located (Stmt Located String)] }
   : '{' '}' {
       []
       <$ $1
       <. $2
     }
-  | '{' some_stmts '}' {
-      toList
-      <$ $1
-      <.> $2
-      <. $3
-    }
+  | non_empty_block { $1 }
 
 expr :: { Located (Expr Located String) }
   : var { $1 }
@@ -265,6 +252,15 @@ expr :: { Located (Expr Located String) }
     }
   | expr '-' expr {
       app (access $1 ("minus" <$ $2)) ((:[]) <%> duplicate $3)
+    }
+  | expr '*' expr {
+      app (access $1 ("multiply" <$ $2)) ((:[]) <%> duplicate $3)
+    }
+  | expr '/' expr {
+      app (access $1 ("div" <$ $2)) ((:[]) <%> duplicate $3)
+    }
+  | expr '%' expr {
+      app (access $1 ("mod" <$ $2)) ((:[]) <%> duplicate $3)
     }
   | '!' expr {
       app (access $2 ("not" <$ $1)) ([] <$ $1)
@@ -363,17 +359,9 @@ object :: { Located (Expr Located String) }
     }
 
 some_props :: { Located (NonEmpty (Located (Property Located String))) }
-  : some_reversed_props {
+  : sepBy1(prop, ',') {
       let props = reverse $1
       in props <$ sequenceA props
-    }
-
-some_reversed_props :: { NonEmpty (Located (Property Located String)) }
-  : prop {
-      $1 :| []
-    }
-  | some_reversed_props ',' prop {
-      $3 <| $1
     }
 
 prop :: { Located (Property Located String) }
@@ -404,6 +392,39 @@ qualified_name :: { Located (String -> String) }
       (.)
       <%> $1
       <.> ((showChar '/' .) . showString . getName <%> $3)
+    }
+
+sepBy1(p, sep) :: { NonEmpty a }
+  : p many(snd(sep, p)) {
+      $1 :| $2
+    }
+
+snd(p, q) :: { a }
+  : p q { $2 }
+
+many(p) :: { [a] }
+  : many_reversed(p) {
+      Prelude.reverse $1
+    }
+
+many_reversed(p) :: { [a] }
+  : { [] }
+  | many_reversed(p) p {
+      $2 : $1
+    }
+
+some(p)
+  : some_reversed(p) {
+      let xs = reverse $1
+      in xs <$ sequenceA xs
+    }
+
+some_reversed(p)
+  : p {
+      $1 :| []
+    }
+  | some_reversed(p) p {
+      $2 <| $1
     }
 
 {

@@ -28,6 +28,7 @@ data Stmt w a = Import (w String) (w a)
               | Return (w (Expr w a))
               | Throw (w (Expr w a))
               | Expr (Expr w a)
+              | Block [w (Stmt w a)]
                  
 type Property w a = (w String, w (Expr w a))
 

@@ -27,6 +27,9 @@ data Token = Name String
            | GE
            | Plus
            | Minus
+           | Multiply
+           | Div
+           | Mod
            | Not
            | Period
            | Comma
