@@ -40,6 +40,7 @@ data Token = Name String
            | OpenBracket
            | CloseBracket
            | Equal
+           | PlusEqual
            | Colon
            | Semi
            | EOF deriving Show

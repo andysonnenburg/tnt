@@ -31,7 +31,10 @@ import Prelude hiding (Ordering (..), getChar, last, lex)
 }
 
 @name = [a-zA-Z_] [a-zA-Z_0-9]*
-@digit = [0-9]
+@decimal = [0-9]+
+@integral = 0|[1-9][0-9]*
+@floating = @decimal \. @decimal
+@number = @integral | @floating
 
 tnt :-
 
@@ -61,6 +64,7 @@ $white+ ;
   \} { special CloseBrace }
   \. { special Period }
   \= { special Equal }
+  "+=" { special PlusEqual }
   \: { special Colon }
   \; { special Semi }
   "import" { special Import }
@@ -76,7 +80,7 @@ $white+ ;
   "return" { special Return }
   "throw" { special Throw }
   @name { name }
-  @digit { integral }
+  @number { number }
   \' { char }
   \" { string }
 }
@@ -98,7 +102,7 @@ char first _ _ = do
     '\'' -> do
       last <- getPoint
       let l = first <> Location last last
-      throwError $ Message l  "lexical error"
+      throwError $ Message l "lexical error"
     '\\' -> do
       c' <- getEscapedChar
       '\'' <- getChar
@@ -128,9 +132,13 @@ string' s = do
       string' (c':s)
     _ -> string' (c:s)
 
-integral :: Action
-integral l _ _ = do
-  return $ Locate l (Number 0)
+number :: Action
+number first s n = do
+  last <- getPoint
+  let l = first <> Location last last
+  return $ Locate l x
+  where
+    x = Number . read $ take n s
 
 getChar :: P Char
 getChar = do

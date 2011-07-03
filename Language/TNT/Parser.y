@@ -41,6 +41,7 @@ import qualified Prelude
   NAME { Locate _ (Name _) }
   ',' { Locate _ Comma }
   '=' { Locate _ Equal }
+  "+=" { Locate _ PlusEqual }
   "||" { Locate _ Token.Or }
   "&&" { Locate _ Token.And }
   '<' { Locate _ LT }
@@ -64,7 +65,7 @@ import qualified Prelude
   ';' { Locate _ Semi }
 
 %left ','
-%right '='
+%right '=' "+="
 %left "||"
 %left "&&"
 %left "==" "!="
@@ -88,7 +89,9 @@ some_stmts :: { Located (NonEmpty (Located (Stmt Located String))) }
   : some(stmt) { $1 }
 
 some_exprs :: { Located (NonEmpty (Located (Expr Located String))) } 
-  : sepBy1(expr, ',') { $1 }
+  : sepBy1(expr, ',') {
+      $1 <$ sequenceA $1
+    }
 
 some_names :: { Located (NonEmpty (Located String)) }
   : some_reversed_names {
@@ -152,7 +155,7 @@ if :: { Located (Stmt Located String) }
     }
 
 for :: { Located (Stmt Located String) }
-  : FOR '(' stmt ';' expr ';' expr ')' block {
+  : FOR '(' decl ';' expr ';' expr ')' block {
       Stmt.For
       <$ $1
       <.> duplicate $3
@@ -248,7 +251,7 @@ expr :: { Located (Expr Located String) }
       app (access $1 ("ge" <$ $2)) ((:[]) <%> duplicate $3)
     }
   | expr '+' expr {
-      app (access $1 ("plus" <$ $2)) ((:[]) <%> duplicate $3)
+      plus $1 $2 $3
     }
   | expr '-' expr {
       app (access $1 ("minus" <$ $2)) ((:[]) <%> duplicate $3)
@@ -264,6 +267,9 @@ expr :: { Located (Expr Located String) }
     }
   | '!' expr {
       app (access $2 ("not" <$ $1)) ([] <$ $1)
+    }
+  | expr '[' expr ']' {
+      app (access $1 ("get" <$ $2)) ((:[]) <%> duplicate $3) <. $4
     }
   | '(' expr ')' {
       $1 .> $2 <. $3
@@ -285,14 +291,10 @@ char :: { Located (Expr Located String) }
     }
 
 var :: { Located (Expr Located String) }
-  : NAME {
-      Stmt.Var . getName <%> $1
-    }
+  : NAME { var $1 }
 
 fun :: { Located (Expr Located String) }
-  : FUN parameters block {
-      fun $1 $2 $3
-    }
+  : FUN parameters block { fun $1 $2 $3 }
 
 parameters :: { Located [Located String] }
   : '(' ')' {
@@ -322,9 +324,10 @@ mutate :: { Located (Expr Located String) }
 
 assign :: { Located (Expr Located String) }
   : NAME '=' expr {
-      Assign
-      <%> duplicate (getName <%> $1)
-      <.> duplicate $3
+      assign $1 $3
+    }
+  | NAME "+=" expr {
+      assign $1 (plus (var $1) $2 $3)
     }
 
 app :: { Located (Expr Located String) }
@@ -360,8 +363,7 @@ object :: { Located (Expr Located String) }
 
 some_props :: { Located (NonEmpty (Located (Property Located String))) }
   : sepBy1(prop, ',') {
-      let props = reverse $1
-      in props <$ sequenceA props
+      $1 <$ sequenceA $1
     }
 
 prop :: { Located (Property Located String) }
@@ -467,6 +469,26 @@ decl var name expr =
   <.> duplicate (getName <$> name)
   <.> duplicate expr
 
+assign :: ( Extend f
+          , Apply f
+          ) =>
+          f Token ->
+          f (Expr f String) ->
+          f (Expr f String)
+assign name expr =
+  Assign
+  <%> duplicate (getName <%> name)
+  <.> duplicate expr
+
+plus :: ( Extend f
+        , Apply f
+        ) =>
+        f (Expr f String) ->
+        f a ->
+        f (Expr f String) ->
+        f (Expr f String)
+plus x op y = app (access x ("plus" <$ op)) ((:[]) <%> duplicate y)
+
 app :: ( Extend f
        , Apply f
        ) =>
@@ -488,6 +510,9 @@ access x y =
   Access
   <$> duplicate x
   <.> duplicate y
+
+var :: Functor f => f Token -> f (Expr f String)
+var name = Stmt.Var . getName <$> name
 
 fun :: ( Extend f
        , Apply f
