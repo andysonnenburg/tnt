@@ -72,7 +72,6 @@ $white+ ;
   "var" { special Var }
   "fun" { special Fun }
   "if" { special If }
-  "elif" { special Elif }
   "else" { special Else }
   "for" { special For }
   "in" { special In }

@@ -146,12 +146,19 @@ if :: { Located (Stmt Located String) }
       <.> duplicate $3
       <.> duplicate $5
     }
+  | IF '(' expr ')' block ELSE if {
+      IfThenElse
+      <$ $1
+      <.> duplicate $3
+      <.> duplicate (Block <%> $5)
+      <.> duplicate $7
+    }
   | IF '(' expr ')' block ELSE block {
       IfThenElse
       <$ $1
       <.> duplicate $3
-      <.> duplicate $5
-      <.> duplicate $7
+      <.> duplicate (Block <%> $5)
+      <.> duplicate (Block <%> $7)
     }
 
 for :: { Located (Stmt Located String) }
@@ -250,9 +257,7 @@ expr :: { Located (Expr Located String) }
   | expr ">=" expr {
       app (access $1 ("ge" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | expr '+' expr {
-      plus $1 $2 $3
-    }
+  | expr '+' expr { plus $1 $2 $3 }
   | expr '-' expr {
       app (access $1 ("minus" <$ $2)) ((:[]) <%> duplicate $3)
     }

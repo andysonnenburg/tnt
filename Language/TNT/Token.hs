@@ -12,7 +12,6 @@ data Token = Name String
            | Var
            | Fun
            | If
-           | Elif
            | Else
            | For
            | In

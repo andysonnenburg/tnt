@@ -11,8 +11,8 @@ data Stmt w a = Import (w String) (w a)
                 (w [w (Stmt w a)])
               | IfThenElse
                 (w (Expr w a))
-                (w [w (Stmt w a)])
-                (w [w (Stmt w a)])
+                (w (Stmt w a))
+                (w (Stmt w a))
               | For
                 (w (Stmt w a))
                 (w (Expr w a))
