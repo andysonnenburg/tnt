@@ -1,28 +1,50 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE
+    FlexibleInstances
+  , GeneralizedNewtypeDeriving
+  , MultiParamTypeClasses
+  , RankNTypes
+  , StandaloneDeriving
+  , UndecidableInstances #-}
 module Language.TNT.Unique
-       ( Unique
-       , UniqueM
-       , runUniqueM
-       , newUnique
+       ( module Language.TNT.Unique.Class
+       , Unique
+       , uniqueToWord
+       , UniqueT
+       , runUniqueT
        ) where
 
 import Control.Applicative
+import Control.Monad.Error
 import Control.Monad.State
 
-newtype Unique = Unique Int deriving Show
+import Data.Word
 
-newtype UniqueM a = UniqueM
-                    { unUniqueM :: State Int a
-                    } deriving ( Functor
-                               , Applicative
-                               , Monad
-                               )
+import Language.TNT.Unique.Class
 
-runUniqueM :: UniqueM a -> a
-runUniqueM = flip evalState 0 . unUniqueM
+newtype Unique = Unique Word deriving Show
 
-newUnique :: UniqueM Unique
-newUnique = UniqueM $ do
-  i <- get
-  put $ i + 1
-  return . Unique $ i
+uniqueToWord :: Unique -> Word
+uniqueToWord (Unique x) = x
+
+newtype UniqueT m a = UniqueT
+                      { unUniqueT :: StateT Word m a
+                      } deriving ( Functor
+                                 , Applicative
+                                 , Monad
+                                 , MonadTrans
+                                 )
+
+deriving instance MonadError e m => MonadError e (UniqueT m)
+
+instance MonadState s m => MonadState s (UniqueT m) where
+  get = UniqueT . lift $ get
+  put = UniqueT . lift . put
+
+runUniqueT :: Monad m => UniqueT m a -> m a
+runUniqueT = flip evalStateT 0 . unUniqueT
+
+instance Monad m => MonadUnique Unique (UniqueT m) where
+  newUnique = UniqueT $ do
+    i <- get
+    put $ i + 1
+    return . Unique $ i

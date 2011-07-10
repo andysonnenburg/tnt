@@ -3,7 +3,9 @@
 module Language.TNT.Parser (parse) where
 
 import Control.Comonad
-import Control.Monad.Error
+import Control.Monad.Error.Class
+import Control.Monad.Identity
+import Control.Monad.Trans
 
 import Data.Foldable (foldr1)
 import Data.Functor.Apply
@@ -11,11 +13,13 @@ import Data.List.NonEmpty
 import Data.Maybe
 import Data.Semigroup
 
+import Language.TNT.Error
 import Language.TNT.Lexer
 import Language.TNT.Location
-import Language.TNT.Message
 import Language.TNT.Stmt as Stmt
-import Language.TNT.Token as Token
+import Language.TNT.Token hiding (False)
+import qualified Language.TNT.Token as Token
+import Language.TNT.Unique
 
 import Prelude hiding (Ordering (..), foldr1, getChar, reverse)
 import qualified Prelude
@@ -38,6 +42,7 @@ import qualified Prelude
   NUMBER { Locate _ (Token.Number _) }
   STRING { Locate _ (Token.String _) }
   CHAR { Locate _ (Token.Char _) }
+  NULL { Locate _ Token.Null }
   NAME { Locate _ (Name _) }
   ',' { Locate _ Comma }
   '=' { Locate _ Equal }
@@ -77,13 +82,19 @@ import qualified Prelude
 
 %name parser
 
-%monad { P }
+%monad { UniqueT P }
 
 %lexer { lexer' } { Locate _ Token.EOF }
 
 %error { parseError }
 
 %%
+
+top :: { Top Located String }
+  : some_stmts {% do
+      x <- newUnique
+      return $ Top x . toList . extract $ $1
+    }
 
 some_stmts :: { Located (NonEmpty (Located (Stmt Located String))) }
   : some(stmt) { $1 }
@@ -117,8 +128,8 @@ stmt :: { Located (Stmt Located String) }
   | while { $1 }
   | return ';' { $1 <. $2 }
   | throw ';' { $1 <. $2 }
-  | expr ';' { Expr <%> $1 <. $2}
-  | non_empty_block { Block <%> $1 }
+  | expr ';' { Expr <%> duplicate $1 <. $2}
+  | non_empty_block { $1 }
 
 import :: { Located (Stmt Located String) }
   : IMPORT qualified_name AS NAME {
@@ -135,8 +146,8 @@ decl :: { Located (Stmt Located String) }
     }
 
 fun_decl :: { Located (Stmt Located String) }
-  : FUN NAME parameters block {
-      decl $1 $2 (fun $1 $3 $4)
+  : FUN NAME parameters block {%
+      decl $1 $2 <%> fun $1 $3 $4
     }
 
 if :: { Located (Stmt Located String) }
@@ -150,15 +161,15 @@ if :: { Located (Stmt Located String) }
       IfThenElse
       <$ $1
       <.> duplicate $3
-      <.> duplicate (Block <%> $5)
+      <.> duplicate $5
       <.> duplicate $7
     }
   | IF '(' expr ')' block ELSE block {
       IfThenElse
       <$ $1
       <.> duplicate $3
-      <.> duplicate (Block <%> $5)
-      <.> duplicate (Block <%> $7)
+      <.> duplicate $5
+      <.> duplicate $7
     }
 
 for :: { Located (Stmt Located String) }
@@ -192,7 +203,7 @@ return :: { Located (Stmt Located String) }
   : RETURN {
       Stmt.Return
       <$ $1
-      <.> duplicate (Null <$ $1)
+      <.> duplicate (Stmt.Null <$ $1)
     }
   | RETURN expr {
       Stmt.Return
@@ -207,17 +218,17 @@ throw :: { Located (Stmt Located String) }
       <.> duplicate $2
     }
 
-non_empty_block :: { Located [Located (Stmt Located String)] }
+non_empty_block :: { Located (Stmt Located String) }
   : '{' some_stmts '}' {
-      toList
+      Block . toList
       <$ $1
       <.> $2
       <. $3
     }
 
-block :: { Located [Located (Stmt Located String)] }
+block :: { Located (Stmt Located String) }
   : '{' '}' {
-      []
+      Block []
       <$ $1
       <. $2
     }
@@ -229,6 +240,7 @@ expr :: { Located (Expr Located String) }
   | number { $1 }
   | string { $1 }
   | char { $1 }
+  | NULL { Stmt.Null <$ $1 }
   | access { $1 }
   | mutate { $1 }
   | assign { $1 }
@@ -299,7 +311,7 @@ var :: { Located (Expr Located String) }
   : NAME { var $1 }
 
 fun :: { Located (Expr Located String) }
-  : FUN parameters block { fun $1 $2 $3 }
+  : FUN parameters block {% fun $1 $2 $3 }
 
 parameters :: { Located [Located String] }
   : '(' ')' {
@@ -435,13 +447,14 @@ some_reversed(p)
     }
 
 {
-parse :: String -> Either Message (Located [Located (Stmt Located String)])
-parse = runP ((toList <$>) <$> parser)
+parse :: String ->
+         ErrorT (Located String) Identity (Top Located String)
+parse = runP . runUniqueT $ parser
   
-parseError :: Located Token -> P a
-parseError (Locate x a) = throwError $ Message x ("parse error: " ++ show a)
+parseError :: Located Token -> UniqueT P a
+parseError x = throwError $ "parse error: " ++ show (extract x) <$ x
 
-lexer' = (lexer >>=)
+lexer' = (lift lexer >>=)
 
 getName :: Token -> String
 getName (Name x) = x
@@ -516,21 +529,23 @@ access x y =
   <$> duplicate x
   <.> duplicate y
 
-var :: Functor f => f Token -> f (Expr f String)
-var name = Stmt.Var . getName <$> name
+var :: Extend f => f Token -> f (Expr f String)
+var x = Stmt.Var <$> duplicate (getName <$> x)
 
 fun :: ( Extend f
        , Apply f
        ) =>
        f a ->
        f [f String] ->
-       f [f (Stmt f String)] ->
-       f (Expr f String)
-fun fun' parameters block =
-  Stmt.Fun
-  <$ fun'
-  <.> duplicate parameters
-  <.> duplicate block
+       f (Stmt f String) ->
+       UniqueT P (f (Expr f String))
+fun fun' parameters block = do
+  x <- newUnique
+  return $
+    Stmt.Fun x
+    <$ fun'
+    <.> duplicate parameters
+    <.> duplicate block
 
 infixl 4 <%>
 

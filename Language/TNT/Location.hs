@@ -1,3 +1,8 @@
+{-# LANGUAGE
+    DeriveFunctor
+  , DeriveFoldable
+  , DeriveTraversable
+  #-}
 module Language.TNT.Location
        ( Point (..)
        , Location (..)
@@ -6,20 +11,23 @@ module Language.TNT.Location
 
 import Control.Comonad
 
+import Data.Foldable
 import Data.Functor.Apply
 import Data.Semigroup
+import Data.Traversable
 
 data Point = Point Int Int deriving (Show, Eq, Ord)
 
 data Location = Location Point Point deriving Show
 
-data Located a = Locate Location a deriving Show
+data Located a = Locate Location a deriving ( Show
+                                            , Functor
+                                            , Foldable
+                                            , Traversable
+                                            )
 
 instance Semigroup Location where
   Location a b <> Location c d = Location (min a c) (max b d)
-    
-instance Functor Located where
-  fmap f (Locate x a) = Locate x (f a)
 
 instance Extend Located where
   duplicate w@(Locate x _) = Locate x w

@@ -11,6 +11,7 @@ import qualified Data.ByteString.Lazy as BL
 
 import Language.TNT.Compiler
 import Language.TNT.Location
+import Language.TNT.Name
 import Language.TNT.Stmt
 
 import System.Console.CmdArgs
@@ -19,8 +20,9 @@ import System.IO
 
 data TNT = TNT { files :: [FilePath] } deriving (Show, Data, Typeable)
 
-deriving instance Show a => Show (Stmt Located a)
-deriving instance Show a => Show (Expr Located a)
+deriving instance Show (Top Located Name)
+deriving instance Show (Stmt Located Name)
+deriving instance Show (Expr Located Name)
 
 tnt :: Mode (CmdArgs TNT)
 tnt = cmdArgsMode TNT { files = def &= args &= typFile }

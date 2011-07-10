@@ -5,6 +5,7 @@ module Language.TNT.Compiler (compile) where
 import Control.Applicative
 import Control.Monad.Code
 import Control.Monad.ConstantPool
+import Control.Monad.Identity
 import Control.Monad.State hiding (Monad (..))
 import Control.Monad.Version
 
@@ -13,22 +14,23 @@ import Data.ByteString.Lazy (ByteString)
 import Data.ByteString.Lazy.Char8 (pack)
 import Data.ClassFile
 import Data.ClassFile.Access
-import Data.Monoid
 
+import Language.TNT.Error
 import Language.TNT.Lexer
 import Language.TNT.Location
-import Language.TNT.Message
 import Language.TNT.Name
+import Language.TNT.Namer
 import Language.TNT.Parser
 import Language.TNT.Stmt
-import Language.TNT.Var
 
 import Prelude
 
 compile :: String ->
            String ->
-           Either Message (Located [Located (Stmt Located String)])
-compile className = parse
+           Either (Located String) (Top Located Name)
+compile className s = runIdentity . runErrorT . f $ s
+  where
+    f = parse >=> name
   -- where
   --   f = runPut .
   --       putClassFile .

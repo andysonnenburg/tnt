@@ -2,6 +2,8 @@ module Language.TNT.Token
        ( Token (..)
        ) where
 
+import Prelude hiding (Bool (..))
+
 data Token = Name String
            | Operator String
            | Number Double
@@ -18,6 +20,9 @@ data Token = Name String
            | While
            | Return
            | Throw
+           | Null
+           | True
+           | False
            | Or
            | And
            | LT
@@ -42,4 +47,4 @@ data Token = Name String
            | PlusEqual
            | Colon
            | Semi
-           | EOF deriving Show
+           | EOF deriving (Eq, Show)

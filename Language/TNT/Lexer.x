@@ -10,7 +10,6 @@ module Language.TNT.Lexer
        ( P
        , runP
        , lexer
-       , lex
        ) where
 
 import Control.Applicative
@@ -23,11 +22,13 @@ import Data.Bits
 import Data.Char
 import Data.Semigroup
 
+import Language.TNT.Error
 import Language.TNT.Location
-import Language.TNT.Message
+import Language.TNT.Scope
 import Language.TNT.Token
+import Language.TNT.Unique
 
-import Prelude hiding (Ordering (..), getChar, last, lex)
+import Prelude hiding (True, False, Ordering (..), getChar, last, lex)
 }
 
 @name = [a-zA-Z_] [a-zA-Z_0-9]*
@@ -78,6 +79,9 @@ $white+ ;
   "while" { special While }
   "return" { special Return }
   "throw" { special Throw }
+  "null" { special Null }
+  "true" { special True }
+  "false" { special False }
   @name { name }
   @number { number }
   \' { char }
@@ -101,7 +105,7 @@ char first _ _ = do
     '\'' -> do
       last <- getPoint
       let l = first <> Location last last
-      throwError $ Message l "lexical error"
+      throwError $ Locate l "lexical error"
     '\\' -> do
       c' <- getEscapedChar
       '\'' <- getChar
@@ -157,7 +161,7 @@ getEscapedChar = do
     _ -> do
       last <- getPoint
       let l = Location first last
-      throwError $ Message l "lexical error"
+      throwError $ Locate l "lexical error"
 
 getInput :: P AlexInput
 getInput = P $ do
@@ -185,53 +189,28 @@ data S = S
          , startCode :: Int
          }
 
-newtype ErrorT e m a = ErrorT
-                       { unErrorT :: m (Either e a)
-                       }
-
-instance Functor m => Functor (ErrorT e m) where
-  fmap f = ErrorT . fmap (fmap f) . unErrorT
-
-instance Monad m => Monad (ErrorT e m) where
-  return = ErrorT . return . return
-  ErrorT m >>= k = ErrorT $ do
-    a <- m
-    case a of
-      Left l -> return . Left $ l
-      Right r -> unErrorT (k r)
-
-instance Monad m => MonadError e (ErrorT e m) where
-  throwError = ErrorT . return . Left
-  ErrorT m `catchError` h = ErrorT $ do
-    a <- m
-    case a of
-      Left e -> unErrorT (h e)
-      r@(Right _) -> return r
-
 newtype P a = P
-              { unP :: StateT S (ErrorT Message Identity) a
+              { unP :: StateT S (ErrorT (Located String) Identity) a
               } deriving ( Functor
                          , Applicative
                          )
 
-deriving instance MonadError Message P
+deriving instance MonadError (Located String) P
 
 instance Monad P where
   return = P . return
   (P m) >>= k = P $ m >>= unP . k
   fail msg = P $ do
     S {..} <- get
-    throwError $ Message (Location point point) msg
+    throwError $ Locate (Location point point) msg
 
-runP :: P a -> String -> Either Message a
-runP (P m) buffer = runIdentity m''
+runP :: P a -> String -> ErrorT (Located String) Identity a
+runP (P m) buffer = evalStateT m s
   where
     s = S { point = Point 1 0
           , buffer
           , startCode = 0
           }
-    m' = evalStateT m s
-    m'' = unErrorT m'
 
 lexer :: P (Located Token)
 lexer = do
@@ -240,7 +219,7 @@ lexer = do
   case alexScan i sc of
     AlexEOF -> return $ Locate (Location p p) EOF
     AlexError (AI p' _) -> 
-      throwError $ Message (Location p p') "lexical error"
+      throwError $ Locate (Location p p') "lexical error"
     AlexSkip i' _ -> do
       setInput i'
       lexer
@@ -248,19 +227,6 @@ lexer = do
       setInput i'
       let l = Location p p'
       m l b n
-
-lex :: String -> Either Message [Located Token]
-lex = runP lex'
-
-lex' :: P [Located Token]
-lex' = do
-  x <- lexer
-  case x of
-    Locate _ EOF ->
-      return []
-    _ -> do
-      xs <- lex'
-      return (x:xs)
 
 data AlexInput = AI Point String
 
