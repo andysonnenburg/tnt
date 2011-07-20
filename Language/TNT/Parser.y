@@ -4,7 +4,8 @@ module Language.TNT.Parser (parse) where
 
 import Control.Comonad
 import Control.Monad.Error.Class
-import Control.Monad.Identity
+import Control.Monad.Identity hiding (mapM)
+import Control.Monad.Reader hiding (mapM)
 import Control.Monad.Trans
 
 import Data.Foldable (foldr1)
@@ -12,6 +13,7 @@ import Data.Functor.Apply
 import Data.List.NonEmpty
 import Data.Maybe
 import Data.Semigroup
+import Data.Traversable hiding (sequenceA)
 
 import Language.TNT.Error
 import Language.TNT.Lexer
@@ -21,7 +23,7 @@ import Language.TNT.Token hiding (False)
 import qualified Language.TNT.Token as Token
 import Language.TNT.Unique
 
-import Prelude hiding (Ordering (..), foldr1, getChar, reverse)
+import Prelude hiding (Ordering (..), foldr1, getChar, mapM, reverse)
 import qualified Prelude
 }
 
@@ -90,10 +92,10 @@ import qualified Prelude
 
 %%
 
-top :: { Top Located String }
+top :: { Def Located String }
   : some_stmts {% do
       x <- newUnique
-      return $ Top x . toList . extract $ $1
+      return $ Top x (Block . toList <%> $1)
     }
 
 some_stmts :: { Located (NonEmpty (Located (Stmt Located String))) }
@@ -120,8 +122,8 @@ some_reversed_names :: { NonEmpty (Located String) }
 
 stmt :: { Located (Stmt Located String) }
   : import ';' { $1 <. $2 }
-  | decl ';' { $1 <. $2 }
-  | fun_decl { $1 }
+  | def ';' { $1 <. $2 }
+  | fun_def { $1 }
   | if { $1 }
   | for { $1 }
   | for_each { $1 }
@@ -140,14 +142,14 @@ import :: { Located (Stmt Located String) }
       <.> duplicate (getName <%> $4)
     }
 
-decl :: { Located (Stmt Located String) }
+def :: { Located (Stmt Located String) }
   : VAR NAME '=' expr {
-      decl $1 $2 $4
+      def $1 $2 $4
     }
 
-fun_decl :: { Located (Stmt Located String) }
+fun_def :: { Located (Stmt Located String) }
   : FUN NAME parameters block {%
-      decl $1 $2 <%> fun $1 $3 $4
+      def $1 $2 <%> fun $1 $3 $4
     }
 
 if :: { Located (Stmt Located String) }
@@ -173,7 +175,7 @@ if :: { Located (Stmt Located String) }
     }
 
 for :: { Located (Stmt Located String) }
-  : FOR '(' decl ';' expr ';' expr ')' block {
+  : FOR '(' def ';' expr ';' expr ')' block {
       Stmt.For
       <$ $1
       <.> duplicate $3
@@ -367,12 +369,12 @@ arguments :: { Located [Located (Expr Located String)] }
 
 object :: { Located (Expr Located String) }
   : '{' '}' {
-      Object []
+      AnonObj []
       <$ $1
       <. $2
     }
   | '{' some_props '}' {
-      Object
+      AnonObj
       <$ $1
       <.> (toList <%> $2)
       <. $3
@@ -447,8 +449,7 @@ some_reversed(p)
     }
 
 {
-parse :: String ->
-         ErrorT (Located String) Identity (Top Located String)
+parse :: String -> ErrorT (Located String) Identity (Unique, Located (Stmt Located String))
 parse = runP . runUniqueT $ parser
   
 parseError :: Located Token -> UniqueT P a
@@ -474,15 +475,15 @@ sequenceA ~(x :| xs) = go x xs
     go y [] = (:| []) <$> y
     go y (z:zs) = (<|) <$> y <.> go z zs
 
-decl :: ( Extend f
-        , Apply f
-        ) =>
-        f a ->
-        f Token ->
-        f (Expr f String) ->
-        f (Stmt f String)
-decl var name expr =
-  Decl
+def :: ( Extend f
+       , Apply f
+       ) =>
+       f a ->
+       f Token ->
+       f (Expr f String) ->
+       f (Stmt f String)
+def var name expr =
+  Def
   <$ var
   <.> duplicate (getName <$> name)
   <.> duplicate expr
@@ -542,7 +543,7 @@ fun :: ( Extend f
 fun fun' parameters block = do
   x <- newUnique
   return $
-    Stmt.Fun x
+    AnonFun x
     <$ fun'
     <.> duplicate parameters
     <.> duplicate block

@@ -1,20 +1,21 @@
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
-module Control.Monad.Code.Class
-       ( module Data.ClassFile.Desc
+{-# LANGUAGE
+    EmptyDataDecls 
+  , FlexibleContexts 
+  , FlexibleInstances 
+  , FunctionalDependencies 
+  , MultiParamTypeClasses 
+  , TypeFamilies 
+  , TypeSynonymInstances 
+  , UndecidableInstances #-}
+module Control.Monad.Code.Class.Typed
+       ( module Data.ClassFile.Desc.Typed
        , MonadCode (..)
        , ldc
        ) where
 
 import qualified Control.Monad.Indexed as Indexed
 
-import Data.ClassFile.Desc
+import Data.ClassFile.Desc.Typed
 import Data.Int hiding (Int)
 import Data.Word
 
@@ -94,9 +95,9 @@ type Operation m p q = m p q (Label m p)
 
 class Indexed.Monad m => MonadCode m where
   
-  data Label m :: * -> *
-  
   data ArrayType m
+  
+  type Label m :: * -> *
   
   boolean :: ArrayType m
   char :: ArrayType m
@@ -122,26 +123,8 @@ class Indexed.Monad m => MonadCode m where
   baload :: Operation m (Int, (Reference, xs)) (Int, xs)
   bastore :: Operation m (Int, (Int, (Reference, xs))) xs
   
-  -- caload :: t (Cons Int (Cons Reference xs)) (Cons Int xs) (Label m)
-  -- castore :: t (Cons Int (Cons Int (Cons Reference xs))) xs (Label m)
   checkcast :: String -> Operation m (Reference, xs) (Reference, xs)
   
-  -- d2f :: t (Cons Double xs) (Cons Float xs) (Label m)
-  -- d2i :: t (Cons Double xs) (Cons Int xs) (Label m)
-  -- d2l :: t (Cons Double xs) (Cons Long xs) (Label m)
-  -- dadd :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  -- daload :: t (Cons Int (Cons Reference xs)) (Cons Double xs) (Label m)
-  -- dastore :: t (Cons Double (Cons Int (Cons Reference xs))) xs (Label m)
-  -- dcmpg :: t (Cons Double (Cons Double xs)) (Cons Int xs) (Label m)
-  -- dcmpl :: t (Cons Double (Cons Double xs)) (Cons Int xs) (Label m)
-  -- ddiv :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  -- dload :: Word16 -> t xs (Cons Double xs) (Label m)
-  -- dmul :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  -- dneg :: t (Cons Double xs) (Cons Double xs) (Label m)
-  -- drem :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
-  -- dreturn :: t (Cons Double xs) xs (Label m)
-  -- dstore :: Word16 -> t xs (Cons Double xs) (Label m)
-  -- dsub :: t (Cons Double (Cons Double xs)) (Cons Double xs) (Label m)
   dup :: ( Take One xs x
          , Concat x xs ys
          ) => Operation m xs ys
@@ -173,16 +156,21 @@ class Indexed.Monad m => MonadCode m where
              , Concat y xs'' ys
              ) => Operation m xs ys
              
-  getfield :: FieldDesc x =>
+  getfield :: ( FieldDesc x
+              , Pop Reference xs xs'
+              , Push x xs' ys
+              ) =>
               String ->
               String ->
               x ->
-              Operation m (Reference, xs) (x, xs)
-  getstatic :: FieldDesc x =>
+              Operation m xs ys
+  getstatic :: ( FieldDesc x
+               , Push x xs ys
+               ) =>
                String ->
                String ->
                x ->
-               Operation m xs (x, xs)
+               Operation m xs ys
   
   goto :: Label m xs -> Operation m xs xs
   

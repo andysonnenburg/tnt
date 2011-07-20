@@ -19,7 +19,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.ClassFile.Access
 import Data.ClassFile.AttributeInfo
 import Data.ClassFile.CpInfo
-import Data.ClassFile.Desc
+import Data.ClassFile.Desc.Typed
 import Data.ClassFile.FieldInfo
 import Data.ClassFile.MethodInfo
 

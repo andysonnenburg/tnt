@@ -31,7 +31,8 @@ library
                , data-binary-ieee754
                , template-haskell
   exposed-modules: Control.Monad.Code
-                 , Control.Monad.Code.Class
+                 , Control.Monad.Code.Class.Typed
+                 , Control.Monad.Code.Class.Untyped
                  , Control.Monad.ConstantPool
                  , Control.Monad.ConstantPool.Class
                  , Control.Monad.Function

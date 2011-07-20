@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module Language.TNT.Namer (name) where
 
 import Control.Applicative
@@ -17,10 +16,14 @@ import Prelude hiding (lookup, mapM)
 
 type Namer = ScopeT (ErrorT (Located String) Identity)
 
-name :: Top Located String ->
-        ErrorT (Located String) Identity (Top Located Name)
-name (Top a b) = flip runScopeT a $ do
-  x <- mapM nameStmt' b
+name :: Def Located String ->
+        Namer (Def Located Name)
+name = nameDef
+
+nameDef :: Def Located String ->
+           Namer (Def Located Name)
+nameDef (Top a b) = do
+  x <- nameStmt' b
   return $ Top a x
   where
     nameStmt' w = do
@@ -33,10 +36,10 @@ nameStmt s = case s of
   Import a b -> do
     x <- define b
     return $ Import a (x <$ b)
-  Decl a b -> do
+  Def a b -> do
     y <- mapM nameExpr b
     x <- define a
-    return $ Decl (x <$ a) y
+    return $ Def (x <$ a) y
   IfThen a b ->
     IfThen
     <$> mapM nameExpr a
@@ -83,12 +86,12 @@ nameExpr e = case e of
   Var a -> do
     x <- lookup a
     return $ Var (x <$ a)
-  Fun a b c ->
+  AnonFun a b c ->
     nestFun a $ do
       let define' x = liftM (<$ x) (define x)
       x <- mapM (mapM define') b
       y <- mapM nameStmt c
-      return (Fun a x y)
+      return $ AnonFun a x y
   Number a ->
     return $ Number a
   String a ->
@@ -99,8 +102,8 @@ nameExpr e = case e of
     return Null
   Bool a ->
     return $ Bool a
-  Object a ->
-    Object
+  AnonObj a ->
+    AnonObj
     <$> mapM (mapM nameProperty) a             
   List a ->
     List

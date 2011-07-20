@@ -15,22 +15,27 @@ import Data.ByteString.Lazy.Char8 (pack)
 import Data.ClassFile
 import Data.ClassFile.Access
 
+-- import Language.TNT.Emitter
 import Language.TNT.Error
+import Language.TNT.LambdaLifter
 import Language.TNT.Lexer
 import Language.TNT.Location
 import Language.TNT.Name
 import Language.TNT.Namer
 import Language.TNT.Parser
+import Language.TNT.Scope
 import Language.TNT.Stmt
 
 import Prelude
 
 compile :: String ->
            String ->
-           Either (Located String) (Top Located Name)
-compile className s = runIdentity . runErrorT . f $ s
+           Either (Located String) (Def Located Name)
+compile x = runIdentity . runErrorT . f
   where
-    f = parse >=> name
+    f s = do
+      (a, b) <- parse s
+      flip runScopeT a . name >=> lambdaLift $ b
   -- where
   --   f = runPut .
   --       putClassFile .

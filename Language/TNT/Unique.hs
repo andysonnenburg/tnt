@@ -15,6 +15,7 @@ module Language.TNT.Unique
 
 import Control.Applicative
 import Control.Monad.Error
+import Control.Monad.Reader
 import Control.Monad.State
 
 import Data.Word
@@ -35,6 +36,7 @@ newtype UniqueT m a = UniqueT
                                  )
 
 deriving instance MonadError e m => MonadError e (UniqueT m)
+deriving instance MonadReader r m => MonadReader r (UniqueT m)
 
 instance MonadState s m => MonadState s (UniqueT m) where
   get = UniqueT . lift $ get
