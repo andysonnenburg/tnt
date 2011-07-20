@@ -6,6 +6,7 @@
   , NamedFieldPuns
   , RecordWildCards
   , StandaloneDeriving #-}
+{-# OPTIONS_GHC -w #-}
 module Language.TNT.Lexer
        ( P
        , runP

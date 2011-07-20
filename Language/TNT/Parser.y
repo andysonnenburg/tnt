@@ -30,27 +30,27 @@ import qualified Prelude
 %tokentype { Located Token }
 
 %token
-  IMPORT { Locate _ Token.Import }
+  IMPORT { Locate _ Import }
   AS { Locate _ As }
-  VAR { Locate _ Token.Var }
-  FUN { Locate _ Token.Fun }
+  VAR { Locate _ Var }
+  FUN { Locate _ Fun }
   IF { Locate _ If }
   ELSE { Locate _ Else }
   FOR { Locate _ Token.For }
   IN { Locate _ In }
-  WHILE { Locate _ Token.While }
-  RETURN { Locate _ Token.Return }
-  THROW { Locate _ Token.Throw }
-  NUMBER { Locate _ (Token.Number _) }
-  STRING { Locate _ (Token.String _) }
-  CHAR { Locate _ (Token.Char _) }
-  NULL { Locate _ Token.Null }
+  WHILE { Locate _ While }
+  RETURN { Locate _ Return }
+  THROW { Locate _ Throw }
+  NUMBER { Locate _ (Number _) }
+  STRING { Locate _ (String _) }
+  CHAR { Locate _ (Char _) }
+  NULL { Locate _ Null }
   NAME { Locate _ (Name _) }
   ',' { Locate _ Comma }
   '=' { Locate _ Equal }
   "+=" { Locate _ PlusEqual }
-  "||" { Locate _ Token.Or }
-  "&&" { Locate _ Token.And }
+  "||" { Locate _ Or }
+  "&&" { Locate _ And }
   '<' { Locate _ LT }
   "<=" { Locate _ LE }
   '>' { Locate _ GT }
@@ -84,7 +84,7 @@ import qualified Prelude
 
 %name parser
 
-%monad { UniqueT P }
+%monad { P }
 
 %lexer { lexer' } { Locate _ Token.EOF }
 
@@ -92,17 +92,16 @@ import qualified Prelude
 
 %%
 
-top :: { Def Located String }
-  : some_stmts {% do
-      x <- newUnique
-      return $ Top x (Block . toList <%> $1)
+top :: { Located (Stmt Located String) }
+  : some_stmts {
+      BlockS . toList <%> $1
     }
 
 some_stmts :: { Located (NonEmpty (Located (Stmt Located String))) }
   : some(stmt) { $1 }
 
-some_exprs :: { Located (NonEmpty (Located (Expr Located String))) } 
-  : sepBy1(expr, ',') {
+some_exps :: { Located (NonEmpty (Located (Exp Located String))) } 
+  : sepBy1(exp, ',') {
       $1 <$ sequenceA $1
     }
 
@@ -130,12 +129,12 @@ stmt :: { Located (Stmt Located String) }
   | while { $1 }
   | return ';' { $1 <. $2 }
   | throw ';' { $1 <. $2 }
-  | expr ';' { Expr <%> duplicate $1 <. $2}
+  | exp ';' { ExpS <%> duplicate $1 <. $2}
   | non_empty_block { $1 }
 
 import :: { Located (Stmt Located String) }
   : IMPORT qualified_name AS NAME {
-      Stmt.Import
+      ImportS
       <$ $1
       <.> duplicate (($ "") <%> $2)
       <. $3
@@ -143,31 +142,31 @@ import :: { Located (Stmt Located String) }
     }
 
 def :: { Located (Stmt Located String) }
-  : VAR NAME '=' expr {
+  : VAR NAME '=' exp {
       def $1 $2 $4
     }
 
 fun_def :: { Located (Stmt Located String) }
-  : FUN NAME parameters block {%
-      def $1 $2 <%> fun $1 $3 $4
+  : FUN NAME parameters block {
+      funDef $1 $2 $3 $4
     }
 
 if :: { Located (Stmt Located String) }
-  : IF '(' expr ')' block {
-      IfThen
+  : IF '(' exp ')' block {
+      IfThenS
       <$ $1
       <.> duplicate $3
       <.> duplicate $5
     }
-  | IF '(' expr ')' block ELSE if {
-      IfThenElse
+  | IF '(' exp ')' block ELSE if {
+      IfThenElseS
       <$ $1
       <.> duplicate $3
       <.> duplicate $5
       <.> duplicate $7
     }
-  | IF '(' expr ')' block ELSE block {
-      IfThenElse
+  | IF '(' exp ')' block ELSE block {
+      IfThenElseS
       <$ $1
       <.> duplicate $3
       <.> duplicate $5
@@ -175,8 +174,8 @@ if :: { Located (Stmt Located String) }
     }
 
 for :: { Located (Stmt Located String) }
-  : FOR '(' def ';' expr ';' expr ')' block {
-      Stmt.For
+  : FOR '(' def ';' exp ';' exp ')' block {
+      ForS
       <$ $1
       <.> duplicate $3
       <.> duplicate $5
@@ -185,8 +184,8 @@ for :: { Located (Stmt Located String) }
     }
 
 for_each :: { Located (Stmt Located String) }
-  : FOR '(' VAR NAME IN expr ')' block {
-      ForEach
+  : FOR '(' VAR NAME IN exp ')' block {
+      ForEachS
       <$ $1
       <.> duplicate (getName <%> $4)
       <.> duplicate $6
@@ -194,8 +193,8 @@ for_each :: { Located (Stmt Located String) }
     }
 
 while :: { Located (Stmt Located String) }
-  : WHILE '(' expr ')' block {
-      Stmt.While
+  : WHILE '(' exp ')' block {
+      WhileS
       <$ $1
       <.> duplicate $3
       <.> duplicate $5
@@ -203,26 +202,26 @@ while :: { Located (Stmt Located String) }
 
 return :: { Located (Stmt Located String) }
   : RETURN {
-      Stmt.Return
+      ReturnS
       <$ $1
-      <.> duplicate (Stmt.Null <$ $1)
+      <.> duplicate (NullE <$ $1)
     }
-  | RETURN expr {
-      Stmt.Return
+  | RETURN exp {
+      ReturnS
       <$ $1
       <.> duplicate $2
     }
 
 throw :: { Located (Stmt Located String) }
-  : THROW expr {
-      Stmt.Throw
+  : THROW exp {
+      ThrowS
       <$ $1
       <.> duplicate $2
     }
 
 non_empty_block :: { Located (Stmt Located String) }
   : '{' some_stmts '}' {
-      Block . toList
+      BlockS . toList
       <$ $1
       <.> $2
       <. $3
@@ -230,90 +229,86 @@ non_empty_block :: { Located (Stmt Located String) }
 
 block :: { Located (Stmt Located String) }
   : '{' '}' {
-      Block []
+      BlockS []
       <$ $1
       <. $2
     }
   | non_empty_block { $1 }
 
-expr :: { Located (Expr Located String) }
+exp :: { Located (Exp Located String) }
   : var { $1 }
-  | fun { $1 }
   | number { $1 }
   | string { $1 }
   | char { $1 }
-  | NULL { Stmt.Null <$ $1 }
+  | NULL { NullE <$ $1 }
   | access { $1 }
   | mutate { $1 }
   | assign { $1 }
   | app { $1 }
   | object { $1 }
   | list { $1 }
-  | expr "||" expr {
-      Stmt.Or
+  | exp "||" exp {
+      OrE
       <%> duplicate $1
       <.> duplicate $3
     }
-  | expr "&&" expr {
-      Stmt.And
+  | exp "&&" exp {
+      AndE
       <%> duplicate $1
       <.> duplicate $3
     }
-  | expr '<' expr {
+  | exp '<' exp {
       app (access $1 ("lt" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | expr "<=" expr {
+  | exp "<=" exp {
       app (access $1 ("le" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | expr '>' expr {
+  | exp '>' exp {
       app (access $1 ("gt" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | expr ">=" expr {
+  | exp ">=" exp {
       app (access $1 ("ge" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | expr '+' expr { plus $1 $2 $3 }
-  | expr '-' expr {
+  | exp '+' exp { plus $1 $2 $3 }
+  | exp '-' exp {
       app (access $1 ("minus" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | expr '*' expr {
+  | exp '*' exp {
       app (access $1 ("multiply" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | expr '/' expr {
+  | exp '/' exp {
       app (access $1 ("div" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | expr '%' expr {
+  | exp '%' exp {
       app (access $1 ("mod" <$ $2)) ((:[]) <%> duplicate $3)
     }
-  | '!' expr {
+  | '!' exp {
       app (access $2 ("not" <$ $1)) ([] <$ $1)
     }
-  | expr '[' expr ']' {
+  | exp '[' exp ']' {
       app (access $1 ("get" <$ $2)) ((:[]) <%> duplicate $3) <. $4
     }
-  | '(' expr ')' {
+  | '(' exp ')' {
       $1 .> $2 <. $3
     }
 
-number :: { Located (Expr Located String) }
+number :: { Located (Exp Located String) }
   : NUMBER {
-      Stmt.Number . getNumber <%> $1
+      NumE . getNumber <%> $1
     }
 
-string :: { Located (Expr Located String) }
+string :: { Located (Exp Located String) }
   : STRING {
-      Stmt.String . getString <%> $1
+      StrE . getString <%> $1
     }
 
-char :: { Located (Expr Located String) }
+char :: { Located (Exp Located String) }
   : CHAR {
-      Stmt.Char . getChar <%> $1
+      CharE . getChar <%> $1
     }
 
-var :: { Located (Expr Located String) }
+var :: { Located (Exp Located String) }
   : NAME { var $1 }
-
-fun :: { Located (Expr Located String) }
-  : FUN parameters block {% fun $1 $2 $3 }
 
 parameters :: { Located [Located String] }
   : '(' ')' {
@@ -328,53 +323,53 @@ parameters :: { Located [Located String] }
       <. $3
     }
 
-access :: { Located (Expr Located String) }
-  : expr '.' NAME {
+access :: { Located (Exp Located String) }
+  : exp '.' NAME {
       access $1 (getName <%> $3)
     }
 
-mutate :: { Located (Expr Located String) }
-  : expr '.' NAME '=' expr {
-      Mutate
+mutate :: { Located (Exp Located String) }
+  : exp '.' NAME '=' exp {
+      MutateE
       <%> duplicate $1
       <.> duplicate (getName <%> $3)
       <.> duplicate $5
     }
 
-assign :: { Located (Expr Located String) }
-  : NAME '=' expr {
+assign :: { Located (Exp Located String) }
+  : NAME '=' exp {
       assign $1 $3
     }
-  | NAME "+=" expr {
+  | NAME "+=" exp {
       assign $1 (plus (var $1) $2 $3)
     }
 
-app :: { Located (Expr Located String) }
-  : expr arguments {
+app :: { Located (Exp Located String) }
+  : exp arguments {
       app $1 $2
     }
 
-arguments :: { Located [Located (Expr Located String)] }
+arguments :: { Located [Located (Exp Located String)] }
   : '(' ')' {
       []
       <$ $1
       <. $2
     }
-  | '(' some_exprs ')' {
+  | '(' some_exps ')' {
       toList
       <$ $1
       <.> $2
       <. $3
     }
 
-object :: { Located (Expr Located String) }
+object :: { Located (Exp Located String) }
   : '{' '}' {
-      AnonObj []
+      ObjE []
       <$ $1
       <. $2
     }
   | '{' some_props '}' {
-      AnonObj
+      ObjE
       <$ $1
       <.> (toList <%> $2)
       <. $3
@@ -386,20 +381,20 @@ some_props :: { Located (NonEmpty (Located (Property Located String))) }
     }
 
 prop :: { Located (Property Located String) }
-  : NAME ':' expr {
+  : NAME ':' exp {
       (,)
       <%> duplicate (getName <%> $1)
       <.> duplicate $3
     }
 
-list :: { Located (Expr Located String) }
+list :: { Located (Exp Located String) }
   : '[' ']' {
-      List []
+      ListE []
       <$ $1
       <. $2
     }
-  | '[' some_exprs ']' {
-      List
+  | '[' some_exps ']' {
+      ListE
       <$ $1
       <.> (toList <%> $2)
       <. $3
@@ -449,25 +444,26 @@ some_reversed(p)
     }
 
 {
-parse :: String -> ErrorT (Located String) Identity (Unique, Located (Stmt Located String))
-parse = runP . runUniqueT $ parser
+parse :: String ->
+         ErrorT (Located String) Identity (Located (Stmt Located String))
+parse = runP parser
   
-parseError :: Located Token -> UniqueT P a
+parseError :: Located Token -> P a
 parseError x = throwError $ "parse error: " ++ show (extract x) <$ x
 
-lexer' = (lift lexer >>=)
+lexer' = (lexer >>=)
 
 getName :: Token -> String
 getName (Name x) = x
 
 getNumber :: Token -> Double
-getNumber (Token.Number x) = x
+getNumber (Number x) = x
 
 getString :: Token -> String
-getString (Token.String x) = x
+getString (String x) = x
 
 getChar :: Token -> Char
-getChar (Token.Char x) = x
+getChar (Char x) = x
 
 sequenceA :: Apply f => NonEmpty (f a) -> f (NonEmpty a)
 sequenceA ~(x :| xs) = go x xs
@@ -480,73 +476,73 @@ def :: ( Extend f
        ) =>
        f a ->
        f Token ->
-       f (Expr f String) ->
+       f (Exp f String) ->
        f (Stmt f String)
-def var name expr =
-  Def
+def var name exp =
+  DefS
   <$ var
   <.> duplicate (getName <$> name)
-  <.> duplicate expr
+  <.> duplicate exp
+
+funDef :: ( Extend f
+          , Apply f
+          ) =>
+          f a ->
+          f Token ->
+          f [f String] ->
+          f (Stmt f String) ->
+          f (Stmt f String)
+funDef fun' name parameters block =
+  FunDefS
+  <$ fun'
+  <.> duplicate (getName <$> name)
+  <.> duplicate parameters
+  <.> duplicate block
 
 assign :: ( Extend f
           , Apply f
           ) =>
           f Token ->
-          f (Expr f String) ->
-          f (Expr f String)
-assign name expr =
-  Assign
+          f (Exp f String) ->
+          f (Exp f String)
+assign name exp =
+  AssignE
   <%> duplicate (getName <%> name)
-  <.> duplicate expr
+  <.> duplicate exp
 
 plus :: ( Extend f
         , Apply f
         ) =>
-        f (Expr f String) ->
+        f (Exp f String) ->
         f a ->
-        f (Expr f String) ->
-        f (Expr f String)
+        f (Exp f String) ->
+        f (Exp f String)
 plus x op y = app (access x ("plus" <$ op)) ((:[]) <%> duplicate y)
 
 app :: ( Extend f
        , Apply f
        ) =>
-       f (Expr f String) ->
-       f [f (Expr f String)] ->
-       f (Expr f String)
+       f (Exp f String) ->
+       f [f (Exp f String)] ->
+       f (Exp f String)
 app x y =
-  App
+  AppE
   <%> duplicate x
   <.> duplicate y
 
 access :: ( Extend f
           , Apply f
           ) =>
-          f (Expr f String) ->
+          f (Exp f String) ->
           f String ->
-          f (Expr f String)
+          f (Exp f String)
 access x y =
-  Access
+  AccessE
   <$> duplicate x
   <.> duplicate y
 
-var :: Extend f => f Token -> f (Expr f String)
-var x = Stmt.Var <$> duplicate (getName <$> x)
-
-fun :: ( Extend f
-       , Apply f
-       ) =>
-       f a ->
-       f [f String] ->
-       f (Stmt f String) ->
-       UniqueT P (f (Expr f String))
-fun fun' parameters block = do
-  x <- newUnique
-  return $
-    AnonFun x
-    <$ fun'
-    <.> duplicate parameters
-    <.> duplicate block
+var :: Extend f => f Token -> f (Exp f String)
+var x = VarE <$> duplicate (getName <$> x)
 
 infixl 4 <%>
 

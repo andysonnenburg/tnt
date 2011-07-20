@@ -3,7 +3,7 @@
 module Language.TNT.Compiler (compile) where
 
 import Control.Applicative
-import Control.Monad.Code
+-- import Control.Monad.Code
 import Control.Monad.ConstantPool
 import Control.Monad.Identity
 import Control.Monad.State hiding (Monad (..))
@@ -15,9 +15,10 @@ import Data.ByteString.Lazy.Char8 (pack)
 import Data.ClassFile
 import Data.ClassFile.Access
 
+import Language.TNT.ClosureLifter
 -- import Language.TNT.Emitter
 import Language.TNT.Error
-import Language.TNT.LambdaLifter
+-- import Language.TNT.LambdaLifter
 import Language.TNT.Lexer
 import Language.TNT.Location
 import Language.TNT.Name
@@ -30,12 +31,14 @@ import Prelude
 
 compile :: String ->
            String ->
-           Either (Located String) (Def Located Name)
-compile x = runIdentity . runErrorT . f
+           Either (Located String) (Dec Located Name)
+compile cn = runIdentity . runErrorT . f
   where
     f s = do
-      (a, b) <- parse s
-      flip runScopeT a . name >=> lambdaLift $ b
+      a <- parse s
+      let x = FunD cn [] a
+      y <- runScopeT . name $ x
+      return . closureLift $ y
   -- where
   --   f = runPut .
   --       putClassFile .

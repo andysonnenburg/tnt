@@ -27,6 +27,7 @@ library
                , binary
                , mtl
                , containers
+               , syb
                , bytestring
                , data-binary-ieee754
                , template-haskell

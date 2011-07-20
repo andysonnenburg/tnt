@@ -1,5 +1,6 @@
 {-# LANGUAGE
-    FlexibleInstances
+    DeriveDataTypeable
+  , FlexibleInstances
   , GeneralizedNewtypeDeriving
   , MultiParamTypeClasses
   , RankNTypes
@@ -18,11 +19,12 @@ import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.State
 
+import Data.Data
 import Data.Word
 
 import Language.TNT.Unique.Class
 
-newtype Unique = Unique Word deriving Show
+newtype Unique = Unique Word deriving (Show, Eq, Ord, Data, Typeable)
 
 uniqueToWord :: Unique -> Word
 uniqueToWord (Unique x) = x

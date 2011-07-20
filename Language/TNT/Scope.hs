@@ -30,7 +30,7 @@ import Language.TNT.Unique
 
 import Prelude hiding (lookup)
 
-data S = S { currentScopeName :: Unique
+data S = S { currentScopeName :: Name
            , currentScope :: Map String Name
            , scopeChain :: [Map String Name]
            }
@@ -51,7 +51,7 @@ instance MonadState s m => MonadState s (ScopeT m) where
 instance MonadTrans ScopeT where
   lift = ScopeT . lift . lift
 
-getCurrentScopeName :: Monad m => ScopeT m Unique
+getCurrentScopeName :: Monad m => ScopeT m Name
 getCurrentScopeName = ScopeT $ do
   S {..} <- get
   return currentScopeName
@@ -71,10 +71,10 @@ getScopeChain = ScopeT $ do
   S {..} <- get
   return scopeChain
 
-runScopeT :: Monad m => ScopeT m a -> Unique -> m a
-runScopeT (ScopeT m) x = runUniqueT $ evalStateT m s
+runScopeT :: Monad m => ScopeT m a -> m a
+runScopeT (ScopeT m) = runUniqueT $ evalStateT m s
   where
-    s = S { currentScopeName = x
+    s = S { currentScopeName = Top
           , currentScope = Map.empty
           , scopeChain = []
           }
@@ -97,7 +97,7 @@ newName :: Monad m => String -> ScopeT m Name
 newName s = do
   x <- getCurrentScopeName
   y <- ScopeT (lift newUnique)
-  return $ Name x y s
+  return $ Nested x y s
 
 lookup :: MonadError (Located String) m => Located String -> ScopeT m Name
 lookup w = do
@@ -128,14 +128,13 @@ nest m = do
   x <- getCurrentScopeName
   nestFun x m
 
-nestFun :: Monad m => Unique -> ScopeT m a -> ScopeT m a
+nestFun :: Monad m => Name -> ScopeT m a -> ScopeT m a
 nestFun x m = ScopeT $ do
   s@S {..} <- get
-  let s' = S { currentScopeName = x
-             , currentScope = Map.empty
-             , scopeChain = currentScope:scopeChain
-             }
-  put s'
+  put S { currentScopeName = x
+        , currentScope = Map.empty
+        , scopeChain = currentScope:scopeChain
+        }
   a <- unScopeT $ m
   put s
   return a
