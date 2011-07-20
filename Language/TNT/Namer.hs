@@ -85,9 +85,10 @@ nameExp e = case e of
   VarE a -> do
     x <- lookup a
     return $ VarE (x <$ a)
-  FunE a -> do
+  FunE a b -> do
     x <- lookup a
-    return $ VarE (x <$ a)
+    y <- mapM lookup (map (<$ a) b)
+    return $ FunE (x <$ a) y
   NumE a ->
     return $ NumE a
   StrE a ->

@@ -78,7 +78,7 @@ data Exp w a where
   BoolE :: Bool -> Exp w a
   ListE :: [w (Exp w a)] -> Exp w a
   ObjE :: [w (Property w a)] -> Exp w a
-  FunE :: w a -> Exp w a
+  FunE :: w a -> [a] -> Exp w a
   AccessE :: w (Exp w a) -> w String -> Exp w a
   MutateE :: w (Exp w a) -> w String -> w (Exp w a) -> Exp w a
   AssignE :: w a -> w (Exp w a) -> Exp w a

@@ -18,14 +18,16 @@ closureLift dec = everywhere' (mkT transform) dec
       | VarE a' <- extract a,
         Set.member (extract a') funs = FunAppE a' b
     transform (VarE a)
-      | Set.member (extract a) funs = FunE a
+      | Set.member (extract a) funs = FunE a []
     transform x = x
     
-    funs = Set.fromList (everything (++) (const [] `extQ` d `extQ` s) dec)
+    funs = Set.fromList (q dec)
     
-    d :: Dec Located Name -> [Name]
-    d (FunD a _ _) = [a]
+    q = everything (++) (const [] `extQ` funD `extQ` funDefS)
     
-    s :: Stmt Located Name -> [Name]
-    s (FunDefS a _ _) = [extract a]
-    s _ = []
+    funD :: Dec Located Name -> [Name]
+    funD (FunD a _ _) = [a]
+    
+    funDefS :: Stmt Located Name -> [Name]
+    funDefS (FunDefS a _ _) = [extract a]
+    funDefS _ = []
