@@ -542,7 +542,7 @@ access x y =
   <.> duplicate y
 
 var :: Extend f => f Token -> f (Exp f String)
-var x = VarE <$> duplicate (getName <$> x)
+var x = VarE <$> (getName <$> x)
 
 infixl 4 <%>
 

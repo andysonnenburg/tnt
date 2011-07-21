@@ -15,7 +15,7 @@ import Data.ByteString.Lazy.Char8 (pack)
 import Data.ClassFile
 import Data.ClassFile.Access
 
-import Language.TNT.ClosureLifter
+import Language.TNT.FunBoxer
 -- import Language.TNT.Emitter
 import Language.TNT.Error
 -- import Language.TNT.LambdaLifter
@@ -38,7 +38,7 @@ compile cn = runIdentity . runErrorT . f
       a <- parse s
       let x = FunD cn [] a
       y <- runScopeT . name $ x
-      return . closureLift $ y
+      return . boxFuns $ y
   -- where
   --   f = runPut .
   --       putClassFile .
