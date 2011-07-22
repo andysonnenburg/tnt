@@ -1,5 +1,6 @@
 {-# LANGUAGE
     DeriveDataTypeable
+  , DeriveFunctor
   , FlexibleContexts
   , GADTs
   , StandaloneDeriving
@@ -49,6 +50,8 @@ data Stmt w a where
   ExpS :: w (Exp w a) -> Stmt w a
   BlockS :: [w (Stmt w a)] -> Stmt w a
 
+deriving instance Functor w => Functor (Stmt w)
+
 deriving instance
   ( Typeable1 w
   , Typeable a
@@ -86,6 +89,8 @@ data Exp w a where
   FunAppE :: w a -> w [w (Exp w a)] -> Exp w a
   OrE :: w (Exp w a) -> w (Exp w a) -> Exp w a
   AndE :: w (Exp w a) -> w (Exp w a) -> Exp w a
+
+deriving instance Functor w => Functor (Exp w)
 
 deriving instance
   ( Typeable1 w
