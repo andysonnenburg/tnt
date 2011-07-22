@@ -18,7 +18,7 @@ import Data.ClassFile.Access
 import Language.TNT.FunBoxer
 -- import Language.TNT.Emitter
 import Language.TNT.Error
--- import Language.TNT.LambdaLifter
+import Language.TNT.LambdaLifter
 import Language.TNT.Lexer
 import Language.TNT.Location
 import Language.TNT.Name
@@ -31,14 +31,14 @@ import Prelude
 
 compile :: String ->
            String ->
-           Either (Located String) (Dec Located Name)
+           Either (Located String) [Dec Located Name]
 compile cn = runIdentity . runErrorT . f
   where
     f s = do
       a <- parse s
       let x = FunD cn [] a
       y <- runScopeT . name $ x
-      return . boxFuns $ y
+      return . ((:) <$> fst <*> snd) . lambdaLift . boxFuns $ y
   -- where
   --   f = runPut .
   --       putClassFile .

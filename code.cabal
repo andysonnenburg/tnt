@@ -27,7 +27,6 @@ library
                , binary
                , mtl
                , containers
-               , syb
                , bytestring
                , data-binary-ieee754
                , template-haskell
@@ -71,6 +70,8 @@ executable tnt
                , semigroups
                , semigroupoids
                , comonad
+               , syb
+               , data-memocombinators
   other-modules: Language.TNT.Lexer, Language.TNT.Parser
   build-tools: alex, happy
   ghc-options: -Wall -O3

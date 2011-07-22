@@ -16,13 +16,11 @@ boxFuns dec = everywhere (mkT unboxFunApp) .
               everywhere (mkT boxFun) $ dec
   where
     boxFun :: Exp Located Name -> Exp Located Name
-    boxFun (VarE a)
-      | Set.member a funs = FunE a []
+    boxFun (VarE a) | Set.member a funs = FunE a []
     boxFun x = x
     
     unboxFunApp :: Exp Located Name -> Exp Located Name
-    unboxFunApp (AppE a b)
-      | FunE x _ <- extract a = FunAppE (x <$ a) b
+    unboxFunApp (AppE a b) | FunE x _ <- extract a = FunAppE (x <$ a) b
     unboxFunApp x = x
     
     funs = Set.fromList (q dec)
