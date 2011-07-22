@@ -4,8 +4,11 @@ module Language.TNT.Var
        , VarSort (..)
        ) where
 
+import Data.Data
+
+import Language.TNT.Name
 import Language.TNT.Unique
 
-data Var = Var VarSort Unique String deriving (Show, Data, Typeable)
+data Var = Var VarSort (Maybe Name) Name deriving (Show, Data, Typeable)
 
-data VarSort = Ref | Val deriving (Show, Data, Typeable)
+data VarSort = Ref | Val | Fun deriving (Show, Eq, Data, Typeable)

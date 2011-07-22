@@ -26,19 +26,21 @@ import Language.TNT.Namer
 import Language.TNT.Parser
 import Language.TNT.Scope
 import Language.TNT.Stmt
+import Language.TNT.Var
+import Language.TNT.VarTyper
 
 import Prelude
 
 compile :: String ->
            String ->
-           Either (Located String) [Dec Located Name]
+           Either (Located String) (Dec Located Var)
 compile cn = runIdentity . runErrorT . f
   where
     f s = do
       a <- parse s
       let x = FunD cn [] a
-      y <- runScopeT . name $ x
-      return . ((:) <$> fst <*> snd) . lambdaLift . boxFuns $ y
+      y <- name x
+      return . typeVars $ y
   -- where
   --   f = runPut .
   --       putClassFile .

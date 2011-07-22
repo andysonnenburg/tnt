@@ -82,6 +82,8 @@ data Exp w a where
   ListE :: [w (Exp w a)] -> Exp w a
   ObjE :: [w (Property w a)] -> Exp w a
   FunE :: a -> [a] -> Exp w a
+  RefE :: a -> Exp w a
+  RefElemE :: a -> Exp w a
   AccessE :: w (Exp w a) -> w String -> Exp w a
   MutateE :: w (Exp w a) -> w String -> w (Exp w a) -> Exp w a
   AssignE :: w a -> w (Exp w a) -> Exp w a

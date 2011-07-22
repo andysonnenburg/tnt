@@ -19,6 +19,7 @@ import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.State
 
+import Data.Bits
 import Data.Data
 import Data.Word
 

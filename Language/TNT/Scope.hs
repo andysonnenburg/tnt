@@ -13,7 +13,6 @@ module Language.TNT.Scope
        , define
        , lookup
        , nest
-       , nestFun
        ) where
 
 import Control.Applicative
@@ -30,10 +29,10 @@ import Language.TNT.Unique
 
 import Prelude hiding (lookup)
 
-data S = S { currentScopeName :: Name
-           , currentScope :: Map String Name
-           , scopeChain :: [Map String Name]
-           }
+data S = S
+         { currentScope :: Map String Name
+         , scopeChain :: [Map String Name]
+         }
 
 newtype ScopeT m a = ScopeT
                      { unScopeT :: StateT S (UniqueT m) a
@@ -50,11 +49,6 @@ instance MonadState s m => MonadState s (ScopeT m) where
 
 instance MonadTrans ScopeT where
   lift = ScopeT . lift . lift
-
-getCurrentScopeName :: Monad m => ScopeT m Name
-getCurrentScopeName = ScopeT $ do
-  S {..} <- get
-  return currentScopeName
 
 getCurrentScope :: Monad m => ScopeT m (Map String Name)
 getCurrentScope = ScopeT $ do
@@ -74,8 +68,7 @@ getScopeChain = ScopeT $ do
 runScopeT :: Monad m => ScopeT m a -> m a
 runScopeT (ScopeT m) = runUniqueT $ evalStateT m s
   where
-    s = S { currentScopeName = Top
-          , currentScope = Map.empty
+    s = S { currentScope = Map.empty
           , scopeChain = []
           }
 
@@ -94,10 +87,9 @@ define w = do
     s = extract w
 
 newName :: Monad m => String -> ScopeT m Name
-newName s = do
-  x <- getCurrentScopeName
-  y <- ScopeT (lift newUnique)
-  return $ Nested x y s
+newName s = ScopeT $ do
+  x <- lift newUnique
+  return $ Name x s
 
 lookup :: MonadError (Located String) m => Located String -> ScopeT m Name
 lookup w = do
@@ -110,7 +102,9 @@ lookup w = do
       lookup' w ms
 
 lookup' :: MonadError (Located String) m =>
-           Located String -> [Map String Name] -> ScopeT m Name
+           Located String ->
+           [Map String Name] ->
+           ScopeT m Name
 lookup' w xs =
   case xs of
     y:ys ->
@@ -124,17 +118,11 @@ lookup' w xs =
     s = extract w
 
 nest :: Monad m => ScopeT m a -> ScopeT m a
-nest m = do
-  x <- getCurrentScopeName
-  nestFun x m
-
-nestFun :: Monad m => Name -> ScopeT m a -> ScopeT m a
-nestFun x m = ScopeT $ do
+nest m = ScopeT $ do
   s@S {..} <- get
-  put S { currentScopeName = x
-        , currentScope = Map.empty
+  put S { currentScope = Map.empty
         , scopeChain = currentScope:scopeChain
         }
-  a <- unScopeT $ m
+  a <- unScopeT m
   put s
   return a

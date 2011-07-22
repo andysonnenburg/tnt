@@ -16,8 +16,9 @@ import Prelude hiding (lookup, mapM)
 
 type Namer = ScopeT (ErrorT (Located String) Identity)
 
-name :: Dec Located String -> Namer (Dec Located Name)
-name = nameDec
+name :: Dec Located String ->
+        ErrorT (Located String) Identity (Dec Located Name)
+name = runScopeT . nameDec
 
 nameDec :: Dec Located String -> Namer (Dec Located Name)
 nameDec (FunD a b c) = do
@@ -37,7 +38,7 @@ nameStmt s = case s of
     return $ DefS (x <$ a) y
   FunDefS a b c -> do    
     x <- define a
-    nestFun x $ do
+    nest $ do
       y <- mapM (mapM define') b
       z <- mapM nameStmt c
       return $ FunDefS (x <$ a) y z

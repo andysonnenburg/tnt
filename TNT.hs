@@ -13,6 +13,7 @@ import Language.TNT.Compiler
 import Language.TNT.Location
 import Language.TNT.Name
 import Language.TNT.Stmt
+import Language.TNT.Var
 
 import System.Console.CmdArgs
 import System.FilePath
@@ -20,9 +21,9 @@ import System.IO
 
 data TNT = TNT { files :: [FilePath] } deriving (Show, Data, Typeable)
 
-deriving instance Show (Dec Located Name)
-deriving instance Show (Stmt Located Name)
-deriving instance Show (Exp Located Name)
+deriving instance Show (Dec Located Var)
+deriving instance Show (Stmt Located Var)
+deriving instance Show (Exp Located Var)
 
 tnt :: Mode (CmdArgs TNT)
 tnt = cmdArgsMode TNT { files = def &= args &= typFile }
